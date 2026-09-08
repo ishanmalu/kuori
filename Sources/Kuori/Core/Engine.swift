@@ -33,6 +33,7 @@ struct Invocation {
     var args: [String] = []          // excludes the resolved binary path
     var producesDirectory = false    // the output path is a directory to create
     var nativeKind: NativeKind? = nil
+    var rasterizeInputToPGM = false  // write a temp PGM first; "{PGM}" in args is the temp path
 }
 
 protocol Converter {
@@ -111,7 +112,18 @@ enum Engine {
         guard let bin = EngineLocator.path(for: plan.engine) else {
             throw ConvertError.engineMissing(plan.engine)
         }
-        let r = ProcessRun.run(bin, plan.args)
+
+        var args = plan.args
+        var tmpPGM: URL?
+        if plan.rasterizeInputToPGM {
+            let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("kuori-\(UUID().uuidString).pgm")
+            try NativeOps.writeGrayPGM(input, to: tmp)
+            tmpPGM = tmp
+            args = args.map { $0 == "{PGM}" ? tmp.path : $0 }
+        }
+        defer { if let t = tmpPGM { try? FileManager.default.removeItem(at: t) } }
+
+        let r = ProcessRun.run(bin, args)
         if r.code != 0 {
             let msg = r.stderr.isEmpty ? r.stdout : r.stderr
             throw ConvertError.processFailed(code: r.code, message: String(msg.suffix(600)))

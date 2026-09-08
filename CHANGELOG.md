@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.2.0 — Phase 2 (unreleased)
+
+- **Tools** (`⌥` in the HUD / `kuori tool …`): Resize, Compress, Crop-to-aspect,
+  Strip metadata, Trim (A/V), Merge PDF, Split PDF — same-format edits that write
+  a new file (`name-resized.jpg`). Presets (¼ / ½ / ≤1920 …, Light/Medium/Strong,
+  1:1 / 4:5 / 16:9 / 9:16).
+- **Raster → SVG** trace: potrace fed a PGM that `NativeOps` rasterizes
+  in-process, so it works without libvips.
+- **PDF**: merge (PDFs + images), split (page per file), compress (downsample +
+  rebuild), strip metadata — all via PDFKit, no binaries.
+- **HUD redesign**: frameless card, keyboard-driven (arrows move · ↵ run · ⌥
+  Tools · Tab locks mode · esc close), category-grouped format tiles, a thin
+  progress bar, auto-dismiss on success. Still one ink / one paper.
+- `kuori tool|merge|split` on the CLI; `Kuori --shot-ui <png> [dark] [tools]`.
+
 ## 0.1.0 — Phase 1 (unreleased)
 
 First working slice.

@@ -36,6 +36,26 @@ enum Naming {
         }
     }
 
+    /// Output for a same-format tool: `photo-resized.jpg`, bumped on collision.
+    static func toolOutput(for input: URL, tag: String, ext: String, into dir: URL?,
+                           collision: Collision = .suffix) -> URL? {
+        let fm = FileManager.default
+        let baseDir = dir ?? input.deletingLastPathComponent()
+        let stem = strippedStem(of: input)
+        func candidate(_ n: Int) -> URL {
+            let base = tag.isEmpty ? stem : "\(stem)-\(tag)"
+            let name = n == 0 ? base : "\(base) \(n)"
+            return baseDir.appendingPathComponent(name).appendingPathExtension(ext)
+        }
+        var n = 0
+        while fm.fileExists(atPath: candidate(n).path) {
+            if collision == .overwrite { return candidate(n) }
+            if collision == .skip { return nil }
+            n += 1
+        }
+        return candidate(n)
+    }
+
     /// Drop the extension, collapsing the `.tar.gz` / `.tgz` double extension.
     static func strippedStem(of url: URL) -> String {
         let name = url.lastPathComponent

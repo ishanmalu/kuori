@@ -86,6 +86,29 @@ enum SelfTest {
         expect(Naming.output(for: srcA, target: jpg, into: nil, collision: .overwrite)?.lastPathComponent == "photo.jpg",
                "overwrite reuses the existing name")
 
+        section("phase 2 — tools & trace")
+        let pdf = Formats.byID["pdf"]!, svg = Formats.byID["svg"]!
+        expect(Tool.resize.applies(to: [jpg], count: 1), "resize applies to images")
+        expect(!Tool.resize.applies(to: [mp3], count: 1), "resize skips audio")
+        expect(Tool.trim.applies(to: [mp4], count: 1) && !Tool.trim.applies(to: [jpg], count: 1), "trim is av-only")
+        expect(Tool.pdfMerge.applies(to: [pdf, pdf], count: 2) && !Tool.pdfMerge.applies(to: [pdf], count: 1),
+               "pdfMerge needs 2+ pdfs")
+        expect(Tool.pdfSplit.applies(to: [pdf], count: 1) && !Tool.pdfSplit.applies(to: [pdf, pdf], count: 2),
+               "pdfSplit needs exactly one pdf")
+        expect(Tool.compress.applies(to: [pdf], count: 1) && Tool.stripMetadata.applies(to: [pdf], count: 1),
+               "pdf accepts compress + strip")
+        expect(Tool.resize.presets.contains { $0.label == "½" } && Tool.compress.presets.count == 3,
+               "presets populated")
+        expect(Naming.toolOutput(for: URL(fileURLWithPath: "/tmp/x/a.jpg"), tag: "resized", ext: "jpg", into: nil)?
+               .lastPathComponent == "a-resized.jpg", "tool output name")
+
+        expect(Engine.targets(for: jpg).contains(svg), "jpg -> svg (trace) offered")
+        if let inv = try? ImageConverter().plan(input: URL(fileURLWithPath: "/tmp/a.jpg"), from: jpg, to: svg,
+                                                output: URL(fileURLWithPath: "/tmp/a.svg"), opts: ConvertOptions()) {
+            expect(inv.engine == .potrace && inv.rasterizeInputToPGM && inv.args.contains("{PGM}"),
+                   "trace plan feeds potrace a PGM")
+        } else { expect(false, "jpg->svg plan built") }
+
         section("engine availability (informational)")
         for id in [EngineID.ffmpeg, .vips, .resvg, .potrace, .pandoc, .qpdf, .sevenzip, .unar, .bsdtar, .exiftool] {
             let where_ = EngineLocator.path(for: id) ?? "— not found (bundle or brew install)"

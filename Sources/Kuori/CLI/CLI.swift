@@ -9,6 +9,9 @@ enum CLI {
         case "formats":            return formats()
         case "info":               return info(Array(args.dropFirst()))
         case "convert":            return convert(Array(args.dropFirst()))
+        case "tool":               return tool(Array(args.dropFirst()))
+        case "merge":              return tool(["pdfMerge"] + args.dropFirst())
+        case "split":              return tool(["pdfSplit"] + args.dropFirst())
         case "-h", "--help", "help": usage(); return 0
         default:
             err("unknown command: \(cmd)")
@@ -83,6 +86,56 @@ enum CLI {
         return failures == 0 ? 0 : 1
     }
 
+    // MARK: tool
+
+    private static func tool(_ args: [String]) -> Int32 {
+        guard let name = args.first,
+              let t = Tool.allCases.first(where: { $0.rawValue.lowercased() == name.lowercased() || $0.label.lowercased() == name.lowercased() }) else {
+            err("usage: kuori tool <\(Tool.allCases.map(\.rawValue).joined(separator: "|"))> <files…> [--preset L] [--quality N] [--scale PCT] [--max-edge N] [--aspect A:B] [--seconds S] [--out DIR]")
+            return 2
+        }
+        var inputs: [URL] = []
+        var p = ToolRunner.Params()
+        var presetLabel: String?
+        var i = 1
+        while i < args.count {
+            let a = args[i]
+            func next() -> String? { i += 1; return i < args.count ? args[i] : nil }
+            switch a {
+            case "--preset":    presetLabel = next()
+            case "--quality":   p.quality = next().flatMap(Int.init)
+            case "--scale":     p.scalePercent = next().flatMap(Int.init)
+            case "--max-edge":  p.maxEdge = next().flatMap(Int.init)
+            case "--aspect":    p.aspect = next()
+            case "--seconds":   p.trimDuration = next().flatMap(Double.init)
+            case "--out", "-o": p.into = next().map { URL(fileURLWithPath: $0, isDirectory: true) }
+            case "--overwrite": p.collision = .overwrite
+            default:            inputs.append(URL(fileURLWithPath: a))
+            }
+            i += 1
+        }
+        if let label = presetLabel, let pre = t.presets.first(where: { $0.label.lowercased() == label.lowercased() }) {
+            let merged = ToolRunner.Params(preset: pre)
+            p.quality = p.quality ?? merged.quality
+            p.scalePercent = p.scalePercent ?? merged.scalePercent
+            p.maxEdge = p.maxEdge ?? merged.maxEdge
+            p.aspect = p.aspect ?? merged.aspect
+            p.trimDuration = p.trimDuration ?? merged.trimDuration
+        }
+        guard !inputs.isEmpty else { err("no input files"); return 2 }
+        for u in inputs where !FileManager.default.fileExists(atPath: u.path) {
+            err("not found: \(u.path)"); return 2
+        }
+        do {
+            let outs = try ToolRunner.run(t, inputs: inputs, params: p)
+            outs.forEach { print("ok    \($0.path)") }
+            return 0
+        } catch {
+            err("fail  \(error.localizedDescription)")
+            return 1
+        }
+    }
+
     // MARK: formats / info
 
     private static func formats() -> Int32 {
@@ -114,6 +167,14 @@ enum CLI {
           kuori convert <files…> --to <format> [--out <dir>] [--quality 1-100]
                        [--scale WxH] [--strip] [--overwrite | --skip-existing]
           kuori convert <in> <out>          two-file form, target inferred from <out>
+
+          kuori tool <name> <files…>        same-format edits — name is one of:
+                       resize | compress | crop | stripMetadata | trim | pdfMerge | pdfSplit
+                       [--preset L] [--quality N] [--scale PCT] [--max-edge N]
+                       [--aspect A:B] [--seconds S] [--out <dir>]
+          kuori merge <pdfs/images…>        alias for: tool pdfMerge
+          kuori split <file.pdf>            alias for: tool pdfSplit
+
           kuori formats                     what converts to what
           kuori info <file>                 identify a file and its routes
         """)

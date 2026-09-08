@@ -1,10 +1,11 @@
 import Foundation
 
 /// Raster images via libvips, with an ImageIO fallback when vips isn't present.
-/// SVG rasterizing via resvg. Raster→SVG (trace) is Phase 2.
+/// SVG rasterizing via resvg; raster → SVG traced with potrace (fed a PGM that
+/// NativeOps rasterizes in-process, so vips isn't required for the trace).
 struct ImageConverter: Converter {
     static let raster = ["jpg", "png", "webp", "heic", "avif", "tiff", "bmp", "gif"]
-    static let imageIOWritable: Set<String> = ["jpg", "png", "tiff", "heic", "gif", "bmp"]
+    static let imageIOWritable: Set<String> = ["jpg", "png", "tiff", "heic", "gif", "bmp", "webp", "avif"]
 
     func targets(for input: Format) -> [Format] {
         guard input.category == .image else { return [] }
@@ -13,6 +14,7 @@ struct ImageConverter: Converter {
         }
         var ids = Set(Self.raster)
         ids.remove(input.id)
+        ids.insert("svg")   // trace
         return ids.compactMap { Formats.byID[$0] }
     }
 
@@ -21,6 +23,13 @@ struct ImageConverter: Converter {
             var a = [input.path, "-o", output.path]
             if let w = opts.scaleWidth { a += ["--width", String(w)] }
             return Invocation(engine: .resvg, args: a)
+        }
+
+        if to.id == "svg" {
+            // potrace reads the PGM; {PGM} is swapped for a temp path by Engine.run.
+            return Invocation(engine: .potrace,
+                              args: ["-s", "--flat", "-o", output.path, "{PGM}"],
+                              rasterizeInputToPGM: true)
         }
 
         // Prefer vips; fall back to in-process ImageIO when it's unavailable.

@@ -1,245 +1,523 @@
 import AppKit
 import UniformTypeIdentifiers
 
-/// The floating drop target. Drop files, then click a format tile to convert.
-/// Shared targets across a multi-file drop are the intersection of each file's
-/// routes, so a tile only appears if every dropped file can produce it.
+/// The floating HUD. Drop files, then pick a format (Convert) or an edit
+/// (Tools, held with ⌥ or toggled with Tab). Fully keyboard-drivable:
+/// arrows move, ↵ runs, esc closes.
 final class DropPanel: NSPanel {
     static let shared = DropPanel()
 
-    private let dropView = DropView()
+    private let hud = HUDView()
 
     private init() {
-        super.init(contentRect: NSRect(x: 0, y: 0, width: 360, height: 240),
-                   styleMask: [.nonactivatingPanel, .titled, .fullSizeContentView, .closable],
+        super.init(contentRect: NSRect(x: 0, y: 0, width: 420, height: 220),
+                   styleMask: [.borderless, .nonactivatingPanel],
                    backing: .buffered, defer: true)
         isFloatingPanel = true
         level = .floating
-        titlebarAppearsTransparent = true
-        titleVisibility = .hidden
+        isOpaque = false
+        backgroundColor = .clear
+        hasShadow = true
         isMovableByWindowBackground = true
-        standardWindowButton(.miniaturizeButton)?.isHidden = true
-        standardWindowButton(.zoomButton)?.isHidden = true
-        backgroundColor = Theme.paper
         hidesOnDeactivate = false
-        contentView = dropView
+        contentView = hud
+        hud.owner = self
     }
+
+    override var canBecomeKey: Bool { true }
 
     func toggle() { isVisible ? orderOut(nil) : showCentered() }
 
     func showCentered() {
+        fitToContent()
         if let screen = NSScreen.main {
             let f = screen.visibleFrame
-            setFrameOrigin(NSPoint(x: f.midX - frame.width / 2, y: f.midY - frame.height / 2))
+            setFrameOrigin(NSPoint(x: f.midX - frame.width / 2, y: f.midY - frame.height / 2 + 40))
         }
         makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+        makeFirstResponder(hud)
     }
 
-    /// Finder Services / external drops.
     func load(urls: [URL]) {
         showCentered()
-        dropView.accept(urls)
+        hud.accept(urls)
     }
+
+    func fitToContent() {
+        hud.layoutSubtreeIfNeeded()
+        setContentSize(hud.fittingSize)
+    }
+
+    /// Used only by `--shot-ui` to render the ⌥ Tools layout headlessly.
+    func previewTools(_ on: Bool) { hud.forceTools(on) }
 }
 
-// MARK: - Monochrome tile
+// MARK: - Chip
 
-private final class TileButton: NSButton {
-    private var hot = false { didSet { needsDisplay = true } }
+private final class Chip: NSView {
+    enum Kind { case format(Format), tool(Tool), preset(Tool, ToolPreset), plain }
+    let kind: Kind
+    let title: String
+    var onActivate: () -> Void = {}
 
-    init(_ format: Format, target: AnyObject, action: Selector) {
+    var gridRow = 0, gridCol = 0
+    var enabled = true { didSet { needsDisplay = true } }
+    var selected = false { didSet { needsDisplay = true } }
+    var focused = false { didSet { needsDisplay = true } }
+    private var hovered = false { didSet { needsDisplay = true } }
+
+    init(_ kind: Kind, title: String) {
+        self.kind = kind
+        self.title = title
         super.init(frame: .zero)
-        title = format.label
-        identifier = NSUserInterfaceItemIdentifier(format.id)
-        self.target = target
-        self.action = action
-        isBordered = false
-        bezelStyle = .regularSquare
         wantsLayer = true
         translatesAutoresizingMaskIntoConstraints = false
-        widthAnchor.constraint(equalToConstant: Theme.tileWidth).isActive = true
         heightAnchor.constraint(equalToConstant: Theme.tileHeight).isActive = true
+        let w = title.size(withAttributes: [.font: Chip.font]).width + 24
+        widthAnchor.constraint(equalToConstant: max(Theme.tileWidth, ceil(w))).isActive = true
     }
     required init?(coder: NSCoder) { fatalError() }
+
+    static let font = NSFont.systemFont(ofSize: 12, weight: .medium)
 
     override func updateTrackingAreas() {
         super.updateTrackingAreas()
         trackingAreas.forEach(removeTrackingArea)
         addTrackingArea(NSTrackingArea(rect: bounds, options: [.mouseEnteredAndExited, .activeAlways], owner: self))
     }
-    override func mouseEntered(with event: NSEvent) { hot = isEnabled }
-    override func mouseExited(with event: NSEvent) { hot = false }
+    override func mouseEntered(with e: NSEvent) { hovered = enabled }
+    override func mouseExited(with e: NSEvent) { hovered = false }
+    override func mouseDown(with e: NSEvent) { if enabled { onActivate() } }
 
-    override func draw(_ dirtyRect: NSRect) {
-        let r = bounds.insetBy(dx: 0.5, dy: 0.5)
+    override func draw(_ dirty: NSRect) {
+        let r = bounds.insetBy(dx: 1, dy: 1)
+        let fill = selected || hovered
         let path = NSBezierPath(roundedRect: r, xRadius: Theme.tileCorner, yRadius: Theme.tileCorner)
-        if hot { Theme.ink.setFill(); path.fill() }
-        Theme.hairline.setStroke(); path.lineWidth = 1; path.stroke()
+        if fill { Theme.ink.setFill(); path.fill() }
+        (focused ? Theme.ink : Theme.hairline).setStroke()
+        path.lineWidth = focused ? 2 : 1
+        path.stroke()
 
-        let color = hot ? Theme.paper : (isEnabled ? Theme.ink : Theme.inkFaint)
-        let s = NSAttributedString(string: title, attributes: [
-            .font: NSFont.systemFont(ofSize: 12, weight: .medium),
-            .foregroundColor: color,
-        ])
+        let color = fill ? Theme.paper : (enabled ? Theme.ink : Theme.inkFaint)
+        let s = NSAttributedString(string: title, attributes: [.font: Chip.font, .foregroundColor: color])
         let sz = s.size()
-        s.draw(at: NSPoint(x: (bounds.width - sz.width) / 2, y: (bounds.height - sz.height) / 2))
+        s.draw(at: NSPoint(x: (bounds.width - sz.width) / 2, y: (bounds.height - sz.height) / 2 - 0.5))
     }
 }
 
-// MARK: - Drop view
+// MARK: - HUD
 
-private final class DropView: NSView {
+private final class HUDView: NSView {
+    weak var owner: DropPanel?
+
+    private enum Mode { case convert, tools }
+    private var mode: Mode = .convert { didSet { if oldValue != mode { rebuild() } } }
+    private var optionHeld = false
+    private var stickyTools = false
+
     private var inputs: [URL] = []
-    private var dragging = false { didSet { needsDisplay = true } }
-    private var populated = false { didSet { needsDisplay = true } }
+    private var formats: [Format] = []
+    private var selectedTool: Tool?
+    private var running = false
+    private var progress: Double = 0 {
+        didSet { progressBar.fraction = progress; progressBar.needsDisplay = true }
+    }
 
-    private let headline = DropView.label(15, .semibold)
-    private let hint = DropView.label(11, .regular, faint: true)
-    private let grid = NSStackView()
-    private let status = DropView.label(11, .regular, faint: true)
-    private let queue = DispatchQueue(label: "kuori.convert", qos: .userInitiated, attributes: .concurrent)
+    private let title = HUDView.text(13, .semibold)
+    private let sub = HUDView.text(11, .regular, faint: true)
+    private let modePill = HUDView.text(10, .semibold, faint: true)
+    private let footer = HUDView.text(10, .regular, faint: true)
+    private let progressBar = ProgressBar()
+    private let body = NSStackView()
 
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
+    private var rows: [[Chip]] = []
+    private var focus = (r: 0, c: 0)
+
+    override init(frame f: NSRect) {
+        super.init(frame: f)
         registerForDraggedTypes([.fileURL])
         wantsLayer = true
 
-        headline.stringValue = "Drop files to convert"
-        headline.alignment = .center
-        hint.alignment = .center
-        status.alignment = .center
-        status.lineBreakMode = .byTruncatingMiddle
-        grid.orientation = .vertical
-        grid.alignment = .centerX
-        grid.spacing = Theme.tileGap
+        modePill.alignment = .right
+        body.orientation = .vertical
+        body.alignment = .leading
+        body.spacing = 10
 
-        let stack = NSStackView(views: [headline, hint, grid, status])
-        stack.orientation = .vertical
-        stack.alignment = .centerX
-        stack.spacing = 12
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(stack)
+        let head = NSStackView(views: [title, modePill])
+        head.orientation = .horizontal
+        head.distribution = .fill
+        title.setContentHuggingPriority(.defaultLow, for: .horizontal)
+
+        let col = NSStackView(views: [head, sub, progressBar, body, footer])
+        col.orientation = .vertical
+        col.alignment = .leading
+        col.spacing = 8
+        col.translatesAutoresizingMaskIntoConstraints = false
+        col.setHuggingPriority(.required, for: .vertical)
+        addSubview(col)
         NSLayoutConstraint.activate([
-            stack.centerXAnchor.constraint(equalTo: centerXAnchor),
-            stack.centerYAnchor.constraint(equalTo: centerYAnchor),
-            stack.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: Theme.pad),
-            stack.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -Theme.pad),
+            col.leadingAnchor.constraint(equalTo: leadingAnchor, constant: Theme.pad),
+            col.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -Theme.pad),
+            col.topAnchor.constraint(equalTo: topAnchor, constant: Theme.pad),
+            col.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -Theme.pad),
+            head.widthAnchor.constraint(equalTo: col.widthAnchor),
+            progressBar.widthAnchor.constraint(equalTo: col.widthAnchor),
+            progressBar.heightAnchor.constraint(equalToConstant: 2),
         ])
+        resetEmpty()
     }
     required init?(coder: NSCoder) { fatalError() }
 
-    private static func label(_ size: CGFloat, _ weight: NSFont.Weight, faint: Bool = false) -> NSTextField {
+    private static func text(_ size: CGFloat, _ weight: NSFont.Weight, faint: Bool = false) -> NSTextField {
         let t = NSTextField(labelWithString: "")
         t.font = .systemFont(ofSize: size, weight: weight)
         t.textColor = faint ? Theme.inkFaint : Theme.ink
+        t.lineBreakMode = .byTruncatingMiddle
         return t
     }
 
-    // Paper fill + a border that reads as: idle (hairline dashed), armed (solid ink), populated (solid hairline).
-    override func draw(_ dirtyRect: NSRect) {
-        Theme.paper.setFill()
-        bounds.fill()
-        let r = bounds.insetBy(dx: Theme.pad * 0.5, dy: Theme.pad * 0.5)
-        let path = NSBezierPath(roundedRect: r, xRadius: Theme.corner, yRadius: Theme.corner)
-        path.lineWidth = dragging ? 2 : 1
-        (dragging ? Theme.ink : Theme.hairline).setStroke()
-        if !populated && !dragging { path.setLineDash([5, 4], count: 2, phase: 0) }
-        path.stroke()
-    }
-
+    override var intrinsicContentSize: NSSize { NSSize(width: 420, height: NSView.noIntrinsicMetric) }
     override func viewDidChangeEffectiveAppearance() { needsDisplay = true }
 
-    // drag
+    // MARK: paint
 
-    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation { dragging = true; return .copy }
-    override func draggingExited(_ sender: NSDraggingInfo?) { dragging = false }
+    override func draw(_ dirty: NSRect) {
+        Theme.paper.setFill()
+        let card = NSBezierPath(roundedRect: bounds.insetBy(dx: 1, dy: 1),
+                                xRadius: Theme.corner, yRadius: Theme.corner)
+        card.fill()
+        card.lineWidth = 1
+        Theme.hairline.setStroke()
+        card.stroke()
 
-    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
-        dragging = false
-        let opts: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
-        guard let urls = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: opts) as? [URL],
-              !urls.isEmpty else { return false }
-        accept(urls)
-        return true
+        if inputs.isEmpty {
+            let dash = NSBezierPath(roundedRect: bounds.insetBy(dx: Theme.pad, dy: Theme.pad),
+                                    xRadius: Theme.tileCorner, yRadius: Theme.tileCorner)
+            dash.lineWidth = 1
+            dash.setLineDash([5, 4], count: 2, phase: 0)
+            Theme.hairline.setStroke()
+            dash.stroke()
+        }
+    }
+
+    // MARK: content
+
+    private func resetEmpty() {
+        inputs = []; formats = []; selectedTool = nil
+        title.stringValue = "Drop files to convert"
+        sub.stringValue = "images · video · audio · documents · archives"
+        modePill.stringValue = ""
+        footer.stringValue = "drop or ⌘V paste"
+        progressBar.isHidden = true
+        clearBody()
+        owner?.fitToContent()
     }
 
     func accept(_ urls: [URL]) {
         inputs = urls
-        status.stringValue = ""
-        headline.stringValue = urls.count == 1 ? urls[0].lastPathComponent : "\(urls.count) files"
+        formats = urls.compactMap { Formats.byURL($0) }
+        selectedTool = nil
+        running = false
+        progress = 0
+        progressBar.isHidden = true
 
-        let perFile = urls.map { url -> Set<String> in
+        let bytes = urls.reduce(Int64(0)) { $0 + Int64((try? $1.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0) }
+        title.stringValue = urls.count == 1 ? urls[0].lastPathComponent : "\(urls.count) files"
+        let cats = Set(formats.map { $0.category.rawValue })
+        sub.stringValue = "\(cats.sorted().joined(separator: " · "))  ·  \(ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file))"
+        rebuild()
+    }
+
+    private var effectiveMode: Mode { (optionHeld || stickyTools) ? .tools : .convert }
+
+    fileprivate func forceTools(_ on: Bool) {
+        stickyTools = on
+        if !inputs.isEmpty { rebuild() }
+    }
+
+    private func rebuild() {
+        guard !inputs.isEmpty else { return }
+        mode = effectiveMode
+        modePill.stringValue = mode == .tools ? "TOOLS" : "CONVERT"
+        footer.stringValue = running ? "" : "↑↓←→ move   ↵ run   ⌥ tools   esc close"
+        clearBody()
+        rows = []
+
+        switch mode {
+        case .convert: buildConvert()
+        case .tools:   buildTools()
+        }
+
+        assignGrid()
+        focus = (0, 0)
+        refreshFocus()
+        owner?.fitToContent()
+    }
+
+    private func clearBody() {
+        body.arrangedSubviews.forEach { $0.removeFromSuperview() }
+    }
+
+    private func rowStack() -> NSStackView {
+        let s = NSStackView()
+        s.orientation = .horizontal
+        s.spacing = Theme.tileGap
+        s.alignment = .centerY
+        return s
+    }
+
+    private func addChipRows(_ chips: [Chip], perRow: Int = 4, label: String? = nil) {
+        if let label {
+            let l = HUDView.text(10, .semibold, faint: true)
+            l.stringValue = label.uppercased()
+            body.addArrangedSubview(l)
+        }
+        var r = rowStack()
+        for (i, chip) in chips.enumerated() {
+            if i > 0 && i % perRow == 0 { body.addArrangedSubview(r); rows.append(currentRowChips(r)); r = rowStack() }
+            r.addArrangedSubview(chip)
+        }
+        if !r.arrangedSubviews.isEmpty { body.addArrangedSubview(r); rows.append(currentRowChips(r)) }
+    }
+
+    private func currentRowChips(_ s: NSStackView) -> [Chip] { s.arrangedSubviews.compactMap { $0 as? Chip } }
+
+    private func buildConvert() {
+        let perFile = inputs.map { url -> Set<String> in
             guard let f = Formats.byURL(url) else { return [] }
             return Set(Engine.targets(for: f).map(\.id))
         }
         let shared = perFile.dropFirst().reduce(perFile.first ?? []) { $0.intersection($1) }
         let targets = shared.compactMap { Formats.byID[$0] }
-            .filter { $0.id != "folder" || urls.allSatisfy { Formats.byURL($0)?.category == .archive } }
-            .sorted { $0.label < $1.label }
+            .filter { $0.id != "folder" || inputs.allSatisfy { Formats.byURL($0)?.category == .archive } }
 
-        rebuildGrid(with: targets)
-        populated = !targets.isEmpty
-        hint.stringValue = targets.isEmpty ? "nothing converts this whole selection" : "convert all to"
-    }
-
-    private func rebuildGrid(with targets: [Format]) {
-        grid.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        var row = newRow()
-        for (i, fmt) in targets.enumerated() {
-            if i > 0 && i % 4 == 0 { grid.addArrangedSubview(row); row = newRow() }
-            row.addArrangedSubview(TileButton(fmt, target: self, action: #selector(tileClicked(_:))))
+        guard !targets.isEmpty else {
+            let l = HUDView.text(11, .regular, faint: true)
+            l.stringValue = "nothing converts this whole selection"
+            body.addArrangedSubview(l)
+            return
         }
-        if !row.arrangedSubviews.isEmpty { grid.addArrangedSubview(row) }
+        let groups = Category.allCases.compactMap { cat -> (Category, [Format])? in
+            let fs = targets.filter { $0.category == cat }.sorted { $0.label < $1.label }
+            return fs.isEmpty ? nil : (cat, fs)
+        }
+        for (cat, fs) in groups {
+            let chips = fs.map { fmt -> Chip in
+                let c = Chip(.format(fmt), title: fmt.label)
+                c.onActivate = { [weak self] in self?.runConvert(to: fmt) }
+                return c
+            }
+            addChipRows(chips, label: groups.count > 1 ? cat.rawValue : nil)
+        }
     }
 
-    private func newRow() -> NSStackView {
-        let r = NSStackView()
-        r.orientation = .horizontal
-        r.spacing = Theme.tileGap
-        return r
+    private func buildTools() {
+        let applicable = Tool.allCases.filter { $0.applies(to: formats, count: inputs.count) }
+        guard !applicable.isEmpty else {
+            let l = HUDView.text(11, .regular, faint: true)
+            l.stringValue = "no tools for this selection"
+            body.addArrangedSubview(l)
+            return
+        }
+        let toolChips = applicable.map { t -> Chip in
+            let c = Chip(.tool(t), title: t.label)
+            c.selected = (t == selectedTool)
+            c.onActivate = { [weak self] in self?.pickTool(t) }
+            return c
+        }
+        addChipRows(toolChips, perRow: 3)
+
+        if let t = selectedTool, !t.presets.isEmpty {
+            let chips = t.presets.map { p -> Chip in
+                let c = Chip(.preset(t, p), title: p.label)
+                c.onActivate = { [weak self] in self?.runTool(t, preset: p) }
+                return c
+            }
+            addChipRows(chips, perRow: 5)
+        }
     }
 
-    private func allTiles() -> [TileButton] {
-        grid.arrangedSubviews.flatMap { ($0 as? NSStackView)?.arrangedSubviews ?? [] }.compactMap { $0 as? TileButton }
+    private func pickTool(_ t: Tool) {
+        if t.presets.isEmpty { runTool(t, preset: nil); return }
+        selectedTool = (selectedTool == t) ? nil : t
+        rebuild()
     }
 
-    @objc private func tileClicked(_ sender: TileButton) {
-        guard let id = sender.identifier?.rawValue, let target = Formats.byID[id] else { return }
+    // MARK: grid nav
+
+    private func assignGrid() {
+        for (ri, row) in rows.enumerated() {
+            for (ci, chip) in row.enumerated() { chip.gridRow = ri; chip.gridCol = ci }
+        }
+    }
+
+    private func chip(_ r: Int, _ c: Int) -> Chip? {
+        guard rows.indices.contains(r) else { return nil }
+        let row = rows[r]
+        return row[min(max(0, c), row.count - 1)]
+    }
+
+    private func refreshFocus() {
+        for row in rows { for chip in row { chip.focused = false } }
+        chip(focus.r, focus.c)?.focused = true
+    }
+
+    private func move(dr: Int, dc: Int) {
+        guard !rows.isEmpty else { return }
+        var r = focus.r, c = focus.c
+        if dc != 0 {
+            c += dc
+            if c < 0 { r -= 1; c = (rows[safe: r]?.count ?? 1) - 1 }
+            else if c >= (rows[safe: r]?.count ?? 1) { r += 1; c = 0 }
+        }
+        if dr != 0 { r += dr }
+        r = min(max(0, r), rows.count - 1)
+        c = min(max(0, c), rows[r].count - 1)
+        focus = (r, c)
+        refreshFocus()
+    }
+
+    private func activateFocused() { chip(focus.r, focus.c)?.onActivate() }
+
+    // MARK: run
+
+    private func setChips(enabled: Bool) {
+        for row in rows { for chip in row { chip.enabled = enabled } }
+    }
+
+    private func runConvert(to target: Format) {
         let files = inputs
-        guard !files.isEmpty else { return }
-        allTiles().forEach { $0.isEnabled = false }
-
-        let group = DispatchGroup()
-        let lock = NSLock()
-        var done = 0, failed = 0
-        var firstOutput: URL?
-
-        for input in files {
-            guard let output = Naming.output(for: input, target: target, into: nil, collision: .suffix) else { continue }
-            lock.lock(); if firstOutput == nil { firstOutput = output }; lock.unlock()
-            group.enter()
-            queue.async {
-                var ok = true
-                do { try Engine.run(input: input, to: target, output: output, opts: ConvertOptions()) }
-                catch {
-                    ok = false
-                    DispatchQueue.main.async { self.status.stringValue = error.localizedDescription }
-                }
-                lock.lock(); if ok { done += 1 } else { failed += 1 }; let d = done, f = failed; lock.unlock()
-                if f == 0 { DispatchQueue.main.async { self.status.stringValue = "converting \(d) of \(files.count)" } }
-                group.leave()
+        run(count: files.count) { report in
+            var first: URL?
+            for (i, input) in files.enumerated() {
+                guard let out = Naming.output(for: input, target: target, into: nil, collision: .suffix) else { continue }
+                if first == nil { first = out }
+                try Engine.run(input: input, to: target, output: out, opts: ConvertOptions())
+                report(i + 1)
             }
+            return (first, "\(files.count) → \(target.label)")
         }
+    }
 
-        group.notify(queue: .main) {
-            self.allTiles().forEach { $0.isEnabled = true }
-            if failed == 0 {
-                self.status.stringValue = "done — \(done) file\(done == 1 ? "" : "s") to \(target.label)"
-                if let out = firstOutput { NSWorkspace.shared.activateFileViewerSelecting([out]) }
-            } else {
-                self.status.stringValue = "\(done) ok, \(failed) failed"
+    private func runTool(_ tool: Tool, preset: ToolPreset?) {
+        let files = inputs
+        let total = tool == .pdfMerge ? 1 : files.count
+        run(count: total) { report in
+            if tool == .pdfMerge || tool == .pdfSplit {
+                let outs = try ToolRunner.run(tool, inputs: files, params: ToolRunner.Params(preset: preset))
+                report(1)
+                return (outs.first, tool.label)
+            }
+            var first: URL?
+            for (i, input) in files.enumerated() {
+                let outs = try ToolRunner.run(tool, inputs: [input], params: ToolRunner.Params(preset: preset))
+                if first == nil { first = outs.first }
+                report(i + 1)
+            }
+            return (first, "\(tool.label) · \(files.count)")
+        }
+    }
+
+    /// Shared run harness: disables chips, drives the progress bar, reveals the
+    /// result, closes on success.
+    private func run(count: Int, _ work: @escaping (_ report: @escaping (Int) -> Void) throws -> (URL?, String)) {
+        guard !running else { return }
+        running = true
+        setChips(enabled: false)
+        progressBar.isHidden = false
+        progress = 0
+        footer.stringValue = ""
+        let q = DispatchQueue(label: "kuori.run", qos: .userInitiated)
+        q.async { [weak self] in
+            let report: (Int) -> Void = { done in
+                DispatchQueue.main.async { self?.progress = Double(done) / Double(max(1, count)) }
+            }
+            do {
+                let (reveal, summary) = try work(report)
+                DispatchQueue.main.async {
+                    self?.progress = 1
+                    self?.sub.stringValue = "done — \(summary)"
+                    if let reveal { NSWorkspace.shared.activateFileViewerSelecting([reveal]) }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) { self?.owner?.orderOut(nil); self?.finishRun() }
+                }
+            } catch {
+                DispatchQueue.main.async {
+                    self?.sub.stringValue = error.localizedDescription
+                    self?.progressBar.isHidden = true
+                    self?.finishRun()
+                }
             }
         }
     }
+
+    private func finishRun() {
+        running = false
+        progress = 0
+        setChips(enabled: true)
+        footer.stringValue = "↑↓←→ move   ↵ run   ⌥ tools   esc close"
+    }
+
+    // MARK: keyboard
+
+    override var acceptsFirstResponder: Bool { true }
+
+    override func keyDown(with e: NSEvent) {
+        switch e.keyCode {
+        case 53: owner?.orderOut(nil)                       // esc
+        case 123: move(dr: 0, dc: -1)                       // ←
+        case 124: move(dr: 0, dc: +1)                       // →
+        case 125: move(dr: +1, dc: 0)                       // ↓
+        case 126: move(dr: -1, dc: 0)                       // ↑
+        case 36, 76: activateFocused()                      // return / enter
+        case 48: stickyTools.toggle(); rebuild()            // tab
+        default:
+            if let ch = e.charactersIgnoringModifiers, ch == "v", e.modifierFlags.contains(.command) {
+                pasteFiles()
+            } else {
+                super.keyDown(with: e)
+            }
+        }
+    }
+
+    override func flagsChanged(with e: NSEvent) {
+        let held = e.modifierFlags.contains(.option)
+        if held != optionHeld {
+            optionHeld = held
+            if !inputs.isEmpty { rebuild() }
+        }
+        super.flagsChanged(with: e)
+    }
+
+    private func pasteFiles() {
+        let opts: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
+        if let urls = NSPasteboard.general.readObjects(forClasses: [NSURL.self], options: opts) as? [URL], !urls.isEmpty {
+            accept(urls)
+        }
+    }
+
+    // MARK: drag
+
+    override func draggingEntered(_ s: NSDraggingInfo) -> NSDragOperation { .copy }
+    override func performDragOperation(_ s: NSDraggingInfo) -> Bool {
+        let opts: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
+        guard let urls = s.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: opts) as? [URL],
+              !urls.isEmpty else { return false }
+        accept(urls)
+        return true
+    }
+}
+
+private final class ProgressBar: NSView {
+    var fraction: Double = 0
+    override func draw(_ dirty: NSRect) {
+        Theme.hairline.withAlphaComponent(0.4).setFill()
+        bounds.fill()
+        Theme.ink.setFill()
+        NSRect(x: 0, y: 0, width: bounds.width * CGFloat(max(0, min(1, fraction))), height: bounds.height).fill()
+    }
+}
+
+private extension Array {
+    subscript(safe i: Int) -> Element? { indices.contains(i) ? self[i] : nil }
 }
