@@ -43,10 +43,10 @@ enum ToolRunner {
                 guard let f = Formats.byURL(input) else {
                     throw ConvertError.badInput("Unrecognized: \(input.lastPathComponent)")
                 }
-                let ext = input.pathExtension.isEmpty ? f.ext : input.pathExtension
+                let ext = tool.outputExt ?? (input.pathExtension.isEmpty ? f.ext : input.pathExtension)
                 guard let out = Naming.toolOutput(for: input, tag: tag(tool), ext: ext,
                                                   into: params.into, collision: params.collision) else { continue }
-                try one(tool, input: input, format: f, output: out, params: params)
+                try apply(tool, input: input, format: f, output: out, params: params)
                 outputs.append(out)
             }
             return outputs
@@ -60,12 +60,27 @@ enum ToolRunner {
         case .crop: return "cropped"
         case .stripMetadata: return "clean"
         case .trim: return "trimmed"
+        case .ocr: return "ocr"
+        case .removeBackground: return "nobg"
         default: return "out"
         }
     }
 
-    private static func one(_ tool: Tool, input: URL, format f: Format, output: URL, params: Params) throws {
+    /// Run one tool, input → explicit output. Also the entry point for recipe steps.
+    static func apply(_ tool: Tool, input: URL, format f: Format, output: URL, params: Params) throws {
         try FileManager.default.createDirectory(at: output.deletingLastPathComponent(), withIntermediateDirectories: true)
+
+        switch tool {
+        case .ocr:
+            try NativeOps.ocrToSearchablePDF(input, to: output)
+            return
+        case .removeBackground:
+            guard f.category == .image else { throw ConvertError.badInput("Remove background needs an image.") }
+            try NativeOps.removeBackground(input, to: output)
+            return
+        default:
+            break
+        }
 
         switch (tool, f.category) {
 

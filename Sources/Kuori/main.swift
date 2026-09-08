@@ -8,7 +8,8 @@ if rawArgs.first == "--selftest" {
 
 // CLI mode: anything that starts with a known verb runs headless and exits.
 if let first = rawArgs.first,
-   ["convert", "tool", "merge", "split", "formats", "info", "help", "-h", "--help"].contains(first) {
+   ["convert", "tool", "merge", "split", "recipe", "watch", "presets", "recipes",
+    "formats", "info", "help", "-h", "--help"].contains(first) {
     exit(CLI.run(rawArgs))
 }
 
@@ -23,7 +24,8 @@ if let i = rawArgs.firstIndex(of: "--shot-ui") {
     panel.showCentered()
     panel.load(urls: [URL(fileURLWithPath: "/tmp/holiday.png"),
                       URL(fileURLWithPath: "/tmp/logo.jpg")])
-    if rawArgs.contains("tools") { panel.previewTools(true) }
+    if rawArgs.contains("tools") { panel.previewMode("tools") }
+    if rawArgs.contains("recipes") { panel.previewMode("recipes") }
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
         guard let view = panel.contentView else { exit(1) }
         view.layoutSubtreeIfNeeded()

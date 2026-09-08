@@ -4,17 +4,29 @@ import Foundation
 /// A conversion changes the container; a tool keeps it and rewrites the bytes.
 enum Tool: String, CaseIterable {
     case resize, compress, crop, stripMetadata, trim
+    case ocr, removeBackground
     case pdfMerge, pdfSplit
 
     var label: String {
         switch self {
-        case .resize:        return "Resize"
-        case .compress:      return "Compress"
-        case .crop:          return "Crop"
-        case .stripMetadata: return "Strip metadata"
-        case .trim:          return "Trim"
-        case .pdfMerge:      return "Merge PDF"
-        case .pdfSplit:      return "Split PDF"
+        case .resize:           return "Resize"
+        case .compress:         return "Compress"
+        case .crop:             return "Crop"
+        case .stripMetadata:    return "Strip metadata"
+        case .trim:             return "Trim"
+        case .ocr:              return "OCR → PDF"
+        case .removeBackground: return "Remove bg"
+        case .pdfMerge:         return "Merge PDF"
+        case .pdfSplit:         return "Split PDF"
+        }
+    }
+
+    /// Tools that always write a specific type regardless of input.
+    var outputExt: String? {
+        switch self {
+        case .ocr:              return "pdf"
+        case .removeBackground: return "png"
+        default:                return nil
         }
     }
 
@@ -32,7 +44,7 @@ enum Tool: String, CaseIterable {
         case .trim:
             return [.init("first 5s", trim: 5), .init("first 10s", trim: 10),
                     .init("first 30s", trim: 30), .init("first 60s", trim: 60)]
-        case .stripMetadata, .pdfMerge, .pdfSplit:
+        case .stripMetadata, .ocr, .removeBackground, .pdfMerge, .pdfSplit:
             return []
         }
     }
@@ -51,6 +63,10 @@ enum Tool: String, CaseIterable {
             return cats.isSubset(of: [.image, .video, .audio]) || formats.allSatisfy { $0.id == "pdf" }
         case .trim:
             return cats.isSubset(of: [.video, .audio])
+        case .ocr:
+            return formats.allSatisfy { $0.category == .image } || (first.id == "pdf" && count == 1)
+        case .removeBackground:
+            return cats == [.image]
         case .pdfMerge:
             return count >= 2 && formats.allSatisfy { $0.id == "pdf" || $0.category == .image }
         case .pdfSplit:

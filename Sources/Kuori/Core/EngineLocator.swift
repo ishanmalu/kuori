@@ -17,8 +17,22 @@ enum EngineLocator {
             .appendingPathComponent("Library/Application Support/Kuori/engine", isDirectory: true)
     }
 
+    /// LibreOffice is bring-your-own: a normal install under /Applications, or an
+    /// unpacked copy dropped into Application Support. We never auto-download a
+    /// ~400 MB payload.
+    static func libreOffice() -> String? {
+        let fm = FileManager.default
+        let candidates = [
+            "/Applications/LibreOffice.app/Contents/MacOS/soffice",
+            supportEngineDir.appendingPathComponent("LibreOffice.app/Contents/MacOS/soffice").path,
+            supportEngineDir.appendingPathComponent("soffice").path,
+        ]
+        return candidates.first { fm.isExecutableFile(atPath: $0) }
+    }
+
     static func path(for id: EngineID) -> String? {
         if id == .native { return nil }
+        if id == .libreoffice { return libreOffice() }
         guard let name = binaryName[id] else { return nil }
         let fm = FileManager.default
 

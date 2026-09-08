@@ -49,8 +49,8 @@ final class DropPanel: NSPanel {
         setContentSize(hud.fittingSize)
     }
 
-    /// Used only by `--shot-ui` to render the ⌥ Tools layout headlessly.
-    func previewTools(_ on: Bool) { hud.forceTools(on) }
+    /// Used only by `--shot-ui` to render a non-default mode headlessly.
+    func previewMode(_ name: String) { hud.forceMode(name) }
 }
 
 // MARK: - Chip
@@ -111,10 +111,10 @@ private final class Chip: NSView {
 private final class HUDView: NSView {
     weak var owner: DropPanel?
 
-    private enum Mode { case convert, tools }
+    private enum Mode: CaseIterable { case convert, tools, recipes }
     private var mode: Mode = .convert { didSet { if oldValue != mode { rebuild() } } }
     private var optionHeld = false
-    private var stickyTools = false
+    private var stickyMode: Mode?
 
     private var inputs: [URL] = []
     private var formats: [Format] = []
@@ -224,29 +224,46 @@ private final class HUDView: NSView {
 
         let bytes = urls.reduce(Int64(0)) { $0 + Int64((try? $1.resourceValues(forKeys: [.fileSizeKey]))?.fileSize ?? 0) }
         title.stringValue = urls.count == 1 ? urls[0].lastPathComponent : "\(urls.count) files"
-        let cats = Set(formats.map { $0.category.rawValue })
-        sub.stringValue = "\(cats.sorted().joined(separator: " · "))  ·  \(ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file))"
+        let cats = Set(formats.map { $0.category.rawValue }).sorted().joined(separator: " · ")
+        sub.stringValue = bytes > 0
+            ? "\(cats)  ·  \(ByteCountFormatter.string(fromByteCount: bytes, countStyle: .file))"
+            : cats
         rebuild()
     }
 
-    private var effectiveMode: Mode { (optionHeld || stickyTools) ? .tools : .convert }
+    private var effectiveMode: Mode {
+        if optionHeld { return .tools }
+        return stickyMode ?? .convert
+    }
 
-    fileprivate func forceTools(_ on: Bool) {
-        stickyTools = on
+    fileprivate func forceMode(_ name: String) {
+        switch name {
+        case "tools":   stickyMode = .tools
+        case "recipes": stickyMode = .recipes
+        default:        stickyMode = nil
+        }
         if !inputs.isEmpty { rebuild() }
+    }
+
+    private func cycleMode() {
+        let order = Mode.allCases
+        let cur = stickyMode ?? .convert
+        stickyMode = order[(order.firstIndex(of: cur)! + 1) % order.count]
+        rebuild()
     }
 
     private func rebuild() {
         guard !inputs.isEmpty else { return }
         mode = effectiveMode
-        modePill.stringValue = mode == .tools ? "TOOLS" : "CONVERT"
-        footer.stringValue = running ? "" : "↑↓←→ move   ↵ run   ⌥ tools   esc close"
+        modePill.stringValue = ["CONVERT", "TOOLS", "RECIPES"][Mode.allCases.firstIndex(of: mode)!]
+        footer.stringValue = running ? "" : "↑↓←→ move   ↵ run   ⌥ tools   ⇥ mode   esc close"
         clearBody()
         rows = []
 
         switch mode {
         case .convert: buildConvert()
         case .tools:   buildTools()
+        case .recipes: buildRecipes()
         }
 
         assignGrid()
@@ -342,6 +359,30 @@ private final class HUDView: NSView {
         if t.presets.isEmpty { runTool(t, preset: nil); return }
         selectedTool = (selectedTool == t) ? nil : t
         rebuild()
+    }
+
+    private func buildRecipes() {
+        let recipes = Recipes.all()
+        guard !recipes.isEmpty else { return }
+        let chips = recipes.map { r -> Chip in
+            let c = Chip(.plain, title: r.name)
+            c.onActivate = { [weak self] in self?.runRecipe(r) }
+            return c
+        }
+        addChipRows(chips, perRow: 3)
+    }
+
+    private func runRecipe(_ recipe: Recipe) {
+        let files = inputs
+        run(count: files.count) { report in
+            var first: URL?
+            for (i, input) in files.enumerated() {
+                let out = try RecipeRunner.run(recipe, input: input, into: nil)
+                if first == nil { first = out }
+                report(i + 1)
+            }
+            return (first, "\(recipe.name) · \(files.count)")
+        }
     }
 
     // MARK: grid nav
@@ -470,7 +511,7 @@ private final class HUDView: NSView {
         case 125: move(dr: +1, dc: 0)                       // ↓
         case 126: move(dr: -1, dc: 0)                       // ↑
         case 36, 76: activateFocused()                      // return / enter
-        case 48: stickyTools.toggle(); rebuild()            // tab
+        case 48: cycleMode()                               // tab
         default:
             if let ch = e.charactersIgnoringModifiers, ch == "v", e.modifierFlags.contains(.command) {
                 pasteFiles()
@@ -518,6 +559,3 @@ private final class ProgressBar: NSView {
     }
 }
 
-private extension Array {
-    subscript(safe i: Int) -> Element? { indices.contains(i) ? self[i] : nil }
-}

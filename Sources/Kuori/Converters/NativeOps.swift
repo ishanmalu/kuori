@@ -3,6 +3,9 @@ import AppKit
 import PDFKit
 import ImageIO
 import UniformTypeIdentifiers
+import Vision
+import CoreImage
+import CoreText
 
 /// In-process conversions backed by macOS frameworks. No bundled binary.
 enum NativeOps {
@@ -277,6 +280,89 @@ enum NativeOps {
         }
         doc.documentAttributes = [:]
         guard doc.write(to: output) else { throw ConvertError.badInput("Failed to write \(output.lastPathComponent)") }
+    }
+
+    // MARK: - Vision: OCR → searchable PDF, background removal
+
+    private struct OCRPage { let size: CGSize; let draw: (CGContext) -> Void; let ocr: CGImage }
+
+    static func ocrToSearchablePDF(_ input: URL, to output: URL) throws {
+        var pages: [OCRPage] = []
+        if input.pathExtension.lowercased() == "pdf" {
+            guard let doc = PDFDocument(url: input) else {
+                throw ConvertError.badInput("Couldn't open PDF: \(input.lastPathComponent)")
+            }
+            for i in 0..<doc.pageCount {
+                guard let page = doc.page(at: i) else { continue }
+                let box = page.bounds(for: .mediaBox)
+                let scale: CGFloat = 2
+                let w = Int(box.width * scale), h = Int(box.height * scale)
+                guard w > 0, h > 0,
+                      let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0,
+                                          space: CGColorSpaceCreateDeviceRGB(),
+                                          bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { continue }
+                ctx.setFillColor(NSColor.white.cgColor); ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
+                ctx.saveGState(); ctx.scaleBy(x: scale, y: scale); ctx.translateBy(x: -box.minX, y: -box.minY)
+                page.draw(with: .mediaBox, to: ctx); ctx.restoreGState()
+                guard let raster = ctx.makeImage() else { continue }
+                pages.append(OCRPage(size: box.size, draw: { c in page.draw(with: .mediaBox, to: c) }, ocr: raster))
+            }
+        } else {
+            let img = try loadCGImage(input)
+            let size = CGSize(width: img.width, height: img.height)
+            pages.append(OCRPage(size: size, draw: { c in c.draw(img, in: CGRect(origin: .zero, size: size)) }, ocr: img))
+        }
+        guard !pages.isEmpty else { throw ConvertError.badInput("Nothing to OCR.") }
+
+        var media = CGRect(origin: .zero, size: pages[0].size)
+        guard let pdf = CGContext(output as CFURL, mediaBox: &media, nil) else {
+            throw ConvertError.badInput("Couldn't create \(output.lastPathComponent)")
+        }
+        for p in pages {
+            var box = CGRect(origin: .zero, size: p.size)
+            pdf.beginPage(mediaBox: &box)
+            p.draw(pdf)
+
+            let req = VNRecognizeTextRequest()
+            req.recognitionLevel = .accurate
+            req.usesLanguageCorrection = true
+            try? VNImageRequestHandler(cgImage: p.ocr, options: [:]).perform([req])
+            pdf.setTextDrawingMode(.invisible)
+            for obs in (req.results ?? []) {
+                guard let text = obs.topCandidates(1).first?.string, !text.isEmpty else { continue }
+                let r = VNImageRectForNormalizedRect(obs.boundingBox, Int(p.size.width), Int(p.size.height))
+                guard r.width > 1, r.height > 2 else { continue }
+                let font = CTFontCreateWithName("Helvetica" as CFString, r.height, nil)
+                let line = CTLineCreateWithAttributedString(
+                    NSAttributedString(string: text, attributes: [.font: font]))
+                let measured = CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
+                pdf.textMatrix = CGAffineTransform(scaleX: measured > 1 ? r.width / measured : 1, y: 1)
+                pdf.textPosition = CGPoint(x: r.minX, y: r.minY + r.height * 0.18)
+                CTLineDraw(line, pdf)
+            }
+            pdf.endPage()
+        }
+        pdf.closePDF()
+    }
+
+    static func removeBackground(_ input: URL, to output: URL) throws {
+        let src = try loadCGImage(input)
+        let handler = VNImageRequestHandler(cgImage: src, options: [:])
+        let req = VNGenerateForegroundInstanceMaskRequest()
+        try handler.perform([req])
+        guard let result = req.results?.first else {
+            throw ConvertError.badInput("No clear subject to cut out.")
+        }
+        let maskBuffer = try result.generateScaledMaskForImage(forInstances: result.allInstances, from: handler)
+        let base = CIImage(cgImage: src)
+        let cut = base.applyingFilter("CIBlendWithMask", parameters: [
+            kCIInputMaskImageKey: CIImage(cvPixelBuffer: maskBuffer),
+            kCIInputBackgroundImageKey: CIImage.empty(),
+        ])
+        guard let cg = CIContext().createCGImage(cut, from: base.extent) else {
+            throw ConvertError.badInput("Failed to render cutout.")
+        }
+        try writeCGImage(cg, to: output, id: "png", quality: nil)
     }
 
     // MARK: - Grayscale PGM (feeds potrace for raster → SVG)

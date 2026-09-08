@@ -4,6 +4,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        Presets.seedFileIfMissing()
+        Recipes.seedFileIfMissing()
+        WatchFolders.shared.load()
+        WatchFolders.shared.start()
+
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
             button.image = Self.menuBarIcon()
@@ -11,6 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let menu = NSMenu()
         menu.addItem(withTitle: "Drop Zone", action: #selector(openDropZone), keyEquivalent: "d")
+        menu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
         menu.addItem(.separator())
         let ver = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
         menu.addItem(withTitle: "Kuori \(ver)", action: nil, keyEquivalent: "").isEnabled = false
@@ -19,12 +25,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem.menu = menu
     }
 
-    @objc private func openDropZone() {
-        DropPanel.shared.toggle()
+    @objc private func openDropZone() { DropPanel.shared.toggle() }
+    @objc private func openSettings() { SettingsWindow.shared.show() }
+
+    /// Finder → Services → "Convert with Kuori…"
+    @objc func convertFiles(_ pboard: NSPasteboard, userData: String, error: AutoreleasingUnsafeMutablePointer<NSString>) {
+        let opts: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
+        guard let urls = pboard.readObjects(forClasses: [NSURL.self], options: opts) as? [URL], !urls.isEmpty else { return }
+        DropPanel.shared.load(urls: urls)
     }
 
-    /// A peel curl — the same idea as the app icon, reduced to a monochrome
-    /// template stroke so the menu bar tints it for light/dark automatically.
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        DropPanel.shared.showCentered()
+        return true
+    }
+
+    /// A peel curl — the app icon reduced to a monochrome template stroke so the
+    /// menu bar tints it for light/dark automatically.
     private static func menuBarIcon() -> NSImage {
         let d: CGFloat = 18
         let img = NSImage(size: NSSize(width: d, height: d))
@@ -48,17 +65,5 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         img.unlockFocus()
         img.isTemplate = true
         return img
-    }
-
-    /// Finder → Services → "Convert with Kuori…"
-    @objc func convertFiles(_ pboard: NSPasteboard, userData: String, error: AutoreleasingUnsafeMutablePointer<NSString>) {
-        let opts: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
-        guard let urls = pboard.readObjects(forClasses: [NSURL.self], options: opts) as? [URL], !urls.isEmpty else { return }
-        DropPanel.shared.load(urls: urls)
-    }
-
-    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        DropPanel.shared.showCentered()
-        return true
     }
 }

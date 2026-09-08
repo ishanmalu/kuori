@@ -109,6 +109,34 @@ enum SelfTest {
                    "trace plan feeds potrace a PGM")
         } else { expect(false, "jpg->svg plan built") }
 
+        section("phase 3 — documents")
+        expect(Formats.byID["pptx"] != nil && Formats.byID["xlsx"] != nil, "office formats registered")
+        let md = Formats.byID["md"]!
+        expect(Engine.targets(for: md).map(\.id).contains("docx"), "md -> docx offered")
+        expect(Engine.targets(for: md).map(\.id).contains("pdf"), "md -> pdf offered")
+        expect(Engine.targets(for: pdf).map(\.id).contains("txt"), "pdf -> txt offered")
+        expect(Engine.converter(from: md, to: pdf) is DocConverter, "md->pdf routes to DocConverter")
+
+        section("phase 4 — presets · recipes · tools")
+        expect(Presets.named("web-jpg")?.target == "jpg", "preset lookup")
+        expect(Presets.named("web-jpg")?.options.quality == 80 && Presets.named("web-jpg")?.options.stripMetadata == true,
+               "preset -> options")
+        expect(Presets.all().count >= Presets.builtins.count, "presets merge includes builtins")
+        expect(Recipes.named("web-image")?.steps.count == 3, "recipe lookup")
+        if let r = Recipes.named("square-jpg"),
+           let data = try? JSONEncoder().encode(r),
+           let back = try? JSONDecoder().decode(Recipe.self, from: data) {
+            expect(back.steps.count == r.steps.count && back.steps.last?.to == "jpg", "recipe json round-trips")
+        } else { expect(false, "recipe json round-trips") }
+        expect(Tool.ocr.outputExt == "pdf" && Tool.removeBackground.outputExt == "png", "tool fixed output types")
+        expect(Tool.ocr.applies(to: [png], count: 1) && !Tool.ocr.applies(to: [mp3], count: 1), "ocr applies to images")
+        expect(Tool.removeBackground.applies(to: [jpg], count: 1) && !Tool.removeBackground.applies(to: [pdf], count: 1),
+               "remove-bg is image-only")
+        if let data = try? JSONEncoder().encode(WatchRule(folder: "/tmp/x", toFormat: "webp")),
+           let back = try? JSONDecoder().decode(WatchRule.self, from: data) {
+            expect(back.folder == "/tmp/x" && back.toFormat == "webp" && back.enabled, "watch rule json round-trips")
+        } else { expect(false, "watch rule json round-trips") }
+
         section("engine availability (informational)")
         for id in [EngineID.ffmpeg, .vips, .resvg, .potrace, .pandoc, .qpdf, .sevenzip, .unar, .bsdtar, .exiftool] {
             let where_ = EngineLocator.path(for: id) ?? "— not found (bundle or brew install)"

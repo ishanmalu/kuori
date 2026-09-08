@@ -1,65 +1,93 @@
 # Kuori
 
 A local file converter for macOS — a personal, faster, scriptable take on
-[Tangerine](https://tangerineformac.com/). Menu-bar app plus a `kuori` CLI that
-share one conversion engine. Nothing is uploaded anywhere.
+[Tangerine](https://tangerineformac.com/). *Kuori* is Finnish for **peel / rind**:
+you drop a file in and the format comes away.
 
-Built the same way as [Perch](https://github.com/ishanmalu/perch): Swift + AppKit,
-SwiftPM, **no Xcode**, ad-hoc-signed. Safety checks run as `Kuori --selftest`
-(XCTest isn't in the Command Line Tools SDK).
+Menu-bar HUD plus a `kuori` CLI that share one conversion engine. Nothing is
+uploaded anywhere. Built like [Perch](https://github.com/ishanmalu/perch):
+Swift + AppKit, SwiftPM, **no Xcode**, ad-hoc-signed. Checks run as
+`Kuori --selftest` (XCTest isn't in the Command Line Tools SDK).
 
-## Status
+## What it does
 
-Phase 1 — the conversion core works end to end:
+**Convert** — drop files, pick a format tile (only the ones every dropped file
+can produce):
 
 | Class | Routes | Engine |
 |---|---|---|
-| Images | jpg png webp heic avif tiff bmp gif ↔ each other, svg → raster | libvips (ImageIO fallback) |
+| Images | jpg png webp heic avif tiff bmp gif ↔ each other; svg → raster; raster → svg (trace) | libvips / ImageIO / resvg / potrace |
 | Audio | mp3 m4a aac wav flac ogg opus aiff ↔ each other | ffmpeg |
-| Video | mp4 mov mkv webm avi m4v ↔ each other, → gif, → audio | ffmpeg |
-| PDF | images → PDF, PDF → png/jpg/tiff (page per file) | PDFKit (in-process) |
-| Archives | folder ↔ zip / tar / tar.gz / 7z, extract zip/tar/7z/rar → folder | bsdtar, 7zz |
+| Video | mp4 mov mkv webm avi m4v ↔ each other; → gif; → audio | ffmpeg |
+| Documents | md html rtf txt epub docx odt ↔ each other; office → pdf; pdf → txt/docx | pandoc / LibreOffice / PDFKit |
+| PDF | images → pdf; pdf → png/jpg/tiff | PDFKit |
+| Archives | folder ↔ zip / tar / tar.gz / 7z; extract zip/tar/7z/rar → folder | bsdtar / 7zz |
 
-Planned: raster → SVG trace, PDF merge/split/compress, DOCX/PPTX/XLSX (pandoc +
-on-demand LibreOffice), presets, multi-step recipes, watch folders, native OCR
-and background removal, universal build + DMG. See the plan in the project notes.
+**Tools** (hold ⌥, or Tab) — same-format edits that write a new file:
+Resize · Compress · Crop-to-aspect · Strip metadata · Trim (A/V) ·
+**OCR → searchable PDF** (Vision) · **Remove background** (VisionKit) ·
+Merge PDF · Split PDF.
 
-**RAR creation is not supported** — there's no licensable RAR encoder. Use ZIP or 7z.
+**Recipes** (Tab again) — saved multi-step pipelines (`web-image`, `square-jpg`,
+`reel-to-mp4`, `clip-to-gif`, `scan-to-ocr-pdf`), editable in `recipes.json`.
+
+**Watch folders** — anything dropped into a watched folder is converted (by
+format or by recipe) and the original moved to `_processed/`. Runs in-process;
+add them in Settings or `kuori watch add`.
+
+**RAR creation is not supported** — no licensable RAR encoder. Use ZIP or 7z.
+
+## HUD
+
+Frameless, monochrome, keyboard-driven:
+
+```
+↑↓←→ move    ↵ run    ⌥ Tools    ⇥ cycle Convert / Tools / Recipes    esc close
+```
+
+Drops and ⌘V both load files. Converts run on a background queue with a progress
+bar and auto-dismiss on success.
 
 ## Build & run
 
 ```sh
-swift run Kuori --selftest          # graph + arg-builder checks
-Scripts/build-app.sh 0.1.0         # -> dist/Kuori.app (arm64, ad-hoc signed)
-open dist/Kuori.app                 # menu-bar icon -> "Drop Zone"
+swift run Kuori --selftest             # 48 graph + logic checks
+Scripts/build-app.sh 0.3.0             # -> dist/Kuori.app  (add --universal for arm64+x86_64)
+Scripts/make-dmg.sh 0.3.0             # -> dist/Kuori-0.3.0.dmg
+open dist/Kuori.app                    # menu-bar icon -> Drop Zone / Settings
 ```
 
 ## CLI
 
 ```sh
 kuori convert photo.png --to webp --quality 80
-kuori convert clip.mov --to gif --scale 600x
 kuori convert *.jpg --to pdf --out ~/Desktop
-kuori convert in.png out.avif        # target inferred from the output name
-kuori formats                        # what converts to what
-kuori info movie.mkv
+kuori convert in.png out.avif                     # target inferred from the name
+kuori convert shot.png --preset web-jpg           # saved preset
+kuori tool resize clip.mov --preset "½"
+kuori tool ocr scan.png                           # -> scan-ocr.pdf, searchable
+kuori tool removeBackground portrait.jpg          # -> portrait-nobg.png
+kuori merge a.pdf b.pdf ; kuori split book.pdf
+kuori recipe square-jpg *.png
+kuori watch add ~/Dropbox/Incoming --to webp
+kuori presets ; kuori recipes ; kuori formats ; kuori info movie.mkv
 ```
-
-`--strip` removes metadata where the engine supports it. Collisions get a
-` 2`, ` 3` suffix unless you pass `--overwrite` or `--skip-existing`.
 
 ## Bundled engines
 
 The app finds Homebrew copies on a dev machine. For a self-contained `.app`:
 
 ```sh
-brew install ffmpeg vips qpdf exiftool sevenzip unar dylibbundler
-Scripts/bundle-engines.sh           # -> Resources/engine/ with dylibs relocated
-Scripts/build-app.sh 0.1.0
+brew install ffmpeg vips qpdf exiftool sevenzip unar potrace pandoc dylibbundler
+Scripts/bundle-engines.sh              # -> Resources/engine/ with dylibs relocated
+Scripts/build-app.sh 0.3.0
 ```
 
-Engine licenses live in `LICENSES/`. LibreOffice is downloaded on first use into
-`~/Library/Application Support/Kuori/engine`, never shipped in the bundle.
+**LibreOffice** is bring-your-own: install it under `/Applications` (or drop a
+copy in `~/Library/Application Support/Kuori/engine/`) and Office↔PDF fidelity
+conversions light up. Never auto-downloaded.
+
+Engine licenses live in `LICENSES/`.
 
 ## License
 

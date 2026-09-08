@@ -42,6 +42,12 @@ protocol Converter {
     func plan(input: URL, from: Format, to: Format, output: URL, opts: ConvertOptions) throws -> Invocation
 }
 
+extension Converter {
+    /// Converters that need bespoke, multi-step execution override this and
+    /// return true once they've written `output`. Default: fall through to `plan`.
+    func execute(input: URL, from: Format, to: Format, output: URL, opts: ConvertOptions) throws -> Bool { false }
+}
+
 enum ConvertError: LocalizedError {
     case badInput(String)
     case unsupported(from: String, to: String)
@@ -69,6 +75,7 @@ enum Engine {
         MediaConverter(),
         ArchiveConverter(),
         PDFConverter(),
+        DocConverter(),
     ]
 
     /// De-duplicated list of formats reachable from `input`, sorted by label.
@@ -96,6 +103,11 @@ enum Engine {
         guard let conv = converter(from: from, to: target) else {
             throw ConvertError.unsupported(from: from.id, to: target.id)
         }
+
+        try FileManager.default.createDirectory(at: output.deletingLastPathComponent(),
+                                                withIntermediateDirectories: true)
+        if try conv.execute(input: input, from: from, to: target, output: output, opts: opts) { return }
+
         let plan = try conv.plan(input: input, from: from, to: target, output: output, opts: opts)
 
         if plan.producesDirectory {

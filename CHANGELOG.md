@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.3.0 — Phases 3–5 (unreleased)
+
+- **Documents**: pandoc for md/html/rtf/txt/epub/docx/odt round-trips;
+  LibreOffice (bring-your-own) for Office ↔ PDF fidelity; PDF → txt native.
+  pptx/xlsx/odp/ods registered. Multi-step routes (Markdown → PDF) handled in
+  `DocConverter.execute`.
+- **Presets** (`Presets`, `presets.json`): named format + options, `kuori
+  convert --preset`, `kuori presets`. Six built-ins.
+- **Recipes** (`Recipe` / `RecipeRunner`, `recipes.json`): ordered convert/tool
+  pipelines chained through temp files. `kuori recipe`, HUD Recipes mode. Five
+  built-ins.
+- **Watch folders** (`WatchFolders`, FSEvents, in-process): auto-convert new
+  files by format or recipe, move originals to `_processed/`. `kuori watch
+  add|list|remove|run`, Settings table.
+- **Native tools**: OCR → searchable PDF (Vision text layer, invisible), Remove
+  background (VisionKit foreground mask → transparent PNG).
+- **Settings window**: login toggle (`SMAppService`), watch-folder editor,
+  presets/recipes JSON shortcuts.
+- **HUD**: Tab now cycles Convert → Tools → Recipes.
+- **Distribution**: `build-app.sh --universal`, `make-dmg.sh`, `notarize.sh`,
+  GitHub Actions CI on `macos-15`.
+- 48 self-test checks.
+
 ## 0.2.0 — Phase 2 (unreleased)
 
 - **Tools** (`⌥` in the HUD / `kuori tool …`): Resize, Compress, Crop-to-aspect,

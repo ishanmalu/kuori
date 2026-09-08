@@ -12,6 +12,10 @@ enum CLI {
         case "tool":               return tool(Array(args.dropFirst()))
         case "merge":              return tool(["pdfMerge"] + args.dropFirst())
         case "split":              return tool(["pdfSplit"] + args.dropFirst())
+        case "recipe":             return recipe(Array(args.dropFirst()))
+        case "watch":              return watch(Array(args.dropFirst()))
+        case "presets":            return listNamed(Presets.all().map { "\($0.name)  → \($0.target.uppercased())" })
+        case "recipes":            return listNamed(Recipes.all().map { "\($0.name)  (\($0.steps.count) steps)" })
         case "-h", "--help", "help": usage(); return 0
         default:
             err("unknown command: \(cmd)")
@@ -46,6 +50,15 @@ enum CLI {
             case "--strip":       opts.stripMetadata = true
             case "--overwrite":   collision = .overwrite
             case "--skip-existing": collision = .skip
+            case "--preset", "-p":
+                i += 1
+                guard i < args.count, let preset = Presets.named(args[i]) else {
+                    err("unknown preset: \(i < args.count ? args[i] : "")"); return 2
+                }
+                toID = toID ?? preset.target
+                opts.quality = opts.quality ?? preset.quality
+                opts.scale = opts.scale ?? preset.scale
+                if preset.strip { opts.stripMetadata = true }
             default:
                 inputs.append(URL(fileURLWithPath: a))
             }
@@ -136,6 +149,82 @@ enum CLI {
         }
     }
 
+    // MARK: recipe
+
+    private static func recipe(_ args: [String]) -> Int32 {
+        guard let name = args.first, let r = Recipes.named(name) else {
+            err("usage: kuori recipe <name> <files…> [--out <dir>]   (see: kuori recipes)")
+            return 2
+        }
+        var into: URL?
+        var inputs: [URL] = []
+        var i = 1
+        while i < args.count {
+            if args[i] == "--out" || args[i] == "-o" { i += 1; if i < args.count { into = URL(fileURLWithPath: args[i], isDirectory: true) } }
+            else { inputs.append(URL(fileURLWithPath: args[i])) }
+            i += 1
+        }
+        guard !inputs.isEmpty else { err("no input files"); return 2 }
+        var failures = 0
+        for input in inputs {
+            guard FileManager.default.fileExists(atPath: input.path) else { err("not found: \(input.path)"); failures += 1; continue }
+            do {
+                let out = try RecipeRunner.run(r, input: input, into: into)
+                print("ok    \(input.lastPathComponent)  ->  \(out.path)")
+            } catch {
+                err("fail  \(input.lastPathComponent): \(error.localizedDescription)"); failures += 1
+            }
+        }
+        return failures == 0 ? 0 : 1
+    }
+
+    // MARK: watch
+
+    private static func watch(_ args: [String]) -> Int32 {
+        let w = WatchFolders.shared
+        w.load()
+        switch args.first {
+        case "list", nil:
+            if w.rules.isEmpty { print("no watch folders") }
+            for (i, r) in w.rules.enumerated() {
+                let action = r.recipe.map { "recipe \($0)" } ?? r.toFormat.map { "→ \($0.uppercased())" } ?? "?"
+                print("\(i)  \(r.enabled ? "●" : "○")  \(r.folder)  \(action)")
+            }
+            return 0
+        case "add":
+            var rest = Array(args.dropFirst())
+            var rule = WatchRule(folder: "")
+            var i = 0
+            while i < rest.count {
+                switch rest[i] {
+                case "--to":      i += 1; rule.toFormat = rest[safe: i]
+                case "--recipe":  i += 1; rule.recipe = rest[safe: i]
+                case "--quality": i += 1; rule.quality = rest[safe: i].flatMap(Int.init)
+                default:          rule.folder = (rest[i] as NSString).expandingTildeInPath
+                }
+                i += 1
+            }
+            guard !rule.folder.isEmpty, (rule.toFormat != nil || rule.recipe != nil) else {
+                err("usage: kuori watch add <dir> (--to <fmt> | --recipe <name>) [--quality N]"); return 2
+            }
+            w.add(rule)
+            print("watching \(rule.folder)")
+            return 0
+        case "remove", "rm":
+            guard let n = args.dropFirst().first.flatMap(Int.init) else { err("usage: kuori watch remove <index>"); return 2 }
+            w.remove(at: n); print("removed \(n)"); return 0
+        case "run":
+            w.sweepAll(); print("swept \(w.rules.count) folder(s)"); return 0
+        default:
+            err("usage: kuori watch [list | add <dir> --to <fmt> | remove <n> | run]"); return 2
+        }
+    }
+
+    private static func listNamed(_ lines: [String]) -> Int32 {
+        lines.forEach { print($0) }
+        return 0
+    }
+
     // MARK: formats / info
 
     private static func formats() -> Int32 {
@@ -174,6 +263,14 @@ enum CLI {
                        [--aspect A:B] [--seconds S] [--out <dir>]
           kuori merge <pdfs/images…>        alias for: tool pdfMerge
           kuori split <file.pdf>            alias for: tool pdfSplit
+
+          kuori recipe <name> <files…>      run a saved multi-step pipeline
+          kuori recipes                     list recipes
+          kuori convert … --preset <name>   apply a saved preset
+          kuori presets                     list presets
+
+          kuori watch add <dir> --to <fmt>  auto-convert new files in <dir>
+          kuori watch [list | remove <n> | run]
 
           kuori formats                     what converts to what
           kuori info <file>                 identify a file and its routes

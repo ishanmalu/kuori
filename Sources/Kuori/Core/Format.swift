@@ -57,6 +57,10 @@ enum Formats {
         Format(id: "md",   ext: "md",   category: .document),
         Format(id: "html", ext: "html", category: .document),
         Format(id: "epub", ext: "epub", category: .document),
+        Format(id: "pptx", ext: "pptx", category: .document),
+        Format(id: "xlsx", ext: "xlsx", category: .document),
+        Format(id: "odp",  ext: "odp",  category: .document),
+        Format(id: "ods",  ext: "ods",  category: .document),
         // archive (+ the "folder" pseudo-format used as an extraction target / compression source)
         Format(id: "zip",    ext: "zip",    category: .archive),
         Format(id: "tar",    ext: "tar",    category: .archive),
