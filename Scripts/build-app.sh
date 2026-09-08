@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds Zest.app into dist/. Usage: Scripts/build-app.sh [version]
+# Builds Kuori.app into dist/. Usage: Scripts/build-app.sh [version]
 #
 # arm64-only for now (this machine + personal use). Universal is a later phase:
 # it needs both-arch bottles of every bundled engine lipo'd together.
@@ -9,7 +9,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 VERSION="${1:-0.1.0}"
-APP="dist/Zest.app"
+APP="dist/Kuori.app"
 ARCH="$(uname -m)"
 
 echo "==> Building release binary ($ARCH)"
@@ -20,14 +20,14 @@ mkdir -p dist
 echo "==> Assembling bundle"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp ".build/rel/release/Zest" "$APP/Contents/MacOS/Zest"
+cp ".build/rel/release/Kuori" "$APP/Contents/MacOS/Kuori"
 
-if [ ! -f Resources/Zest.icns ]; then
+if [ ! -f Resources/Kuori.icns ]; then
   echo "==> Generating icon"
   swift Scripts/makeicon.swift Resources >/dev/null
-  iconutil -c icns Resources/Zest.iconset -o Resources/Zest.icns
+  iconutil -c icns Resources/Kuori.iconset -o Resources/Kuori.icns
 fi
-cp Resources/Zest.icns "$APP/Contents/Resources/Zest.icns"
+cp Resources/Kuori.icns "$APP/Contents/Resources/Kuori.icns"
 sed "s/__VERSION__/$VERSION/g" Resources/Info.plist > "$APP/Contents/Info.plist"
 
 # Bundled conversion engines (optional — the app also finds Homebrew copies).

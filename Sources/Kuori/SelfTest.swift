@@ -1,6 +1,6 @@
 import Foundation
 
-/// `Zest --selftest` runs the checks that must hold for the conversion graph to
+/// `Kuori --selftest` runs the checks that must hold for the conversion graph to
 /// be coherent, then exits non-zero on any failure. XCTest isn't in the Command
 /// Line Tools SDK, so tests ship in the binary and run anywhere, including CI
 /// where no engines are installed.
@@ -16,7 +16,7 @@ enum SelfTest {
     private static func section(_ name: String) { print("\n\(name)") }
 
     static func run() -> Never {
-        print("Zest self-test\n")
+        print("Kuori self-test\n")
 
         section("format resolution")
         expect(Formats.byExtension("jpeg")?.id == "jpg", "jpeg alias -> jpg")
@@ -69,7 +69,7 @@ enum SelfTest {
 
         section("output naming")
         let tmp = FileManager.default.temporaryDirectory
-            .appendingPathComponent("zest-selftest-\(UUID().uuidString)")
+            .appendingPathComponent("kuori-selftest-\(UUID().uuidString)")
         try? FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tmp) }
         let srcA = tmp.appendingPathComponent("photo.png")

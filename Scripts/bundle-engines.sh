@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Pulls the conversion engines into Resources/engine/ with their dylibs
-# relocated to @loader_path, so Zest.app is self-contained.
+# relocated to @loader_path, so Kuori.app is self-contained.
 #
 #   Scripts/bundle-engines.sh            # ffmpeg vips qpdf exiftool 7zz unar (default set)
 #   Scripts/bundle-engines.sh ffmpeg     # just one
 #
 # Needs Homebrew for the source binaries and `dylibbundler`
 # (brew install dylibbundler). LibreOffice is intentionally NOT bundled here —
-# the app downloads it on demand into ~/Library/Application Support/Zest/engine.
+# the app downloads it on demand into ~/Library/Application Support/Kuori/engine.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

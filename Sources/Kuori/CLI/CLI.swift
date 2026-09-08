@@ -1,6 +1,6 @@
 import Foundation
 
-/// `Zest convert …`, `Zest formats`, `Zest info <file>`. Shares the exact
+/// `Kuori convert …`, `Kuori formats`, `Kuori info <file>`. Shares the exact
 /// conversion path the GUI uses, so anything the app can do is scriptable.
 enum CLI {
     static func run(_ args: [String]) -> Int32 {
@@ -49,7 +49,7 @@ enum CLI {
             i += 1
         }
 
-        // Two-positional form with no --to: `zest convert in.png out.webp`
+        // Two-positional form with no --to: `kuori convert in.png out.webp`
         if toID == nil, inputs.count == 2,
            let outFmt = Formats.byURL(inputs[1]) ?? Formats.byExtension(inputs[1].pathExtension),
            !FileManager.default.fileExists(atPath: inputs[1].path) {
@@ -98,7 +98,7 @@ enum CLI {
     }
 
     private static func info(_ args: [String]) -> Int32 {
-        guard let path = args.first else { err("usage: zest info <file>"); return 2 }
+        guard let path = args.first else { err("usage: kuori info <file>"); return 2 }
         let url = URL(fileURLWithPath: path)
         guard let f = Formats.byURL(url) else { err("unrecognized: \(path)"); return 1 }
         print("\(url.lastPathComponent)")
@@ -109,13 +109,13 @@ enum CLI {
 
     private static func usage() {
         print("""
-        Zest — local file converter
+        Kuori — local file converter
 
-          zest convert <files…> --to <format> [--out <dir>] [--quality 1-100]
+          kuori convert <files…> --to <format> [--out <dir>] [--quality 1-100]
                        [--scale WxH] [--strip] [--overwrite | --skip-existing]
-          zest convert <in> <out>          two-file form, target inferred from <out>
-          zest formats                     what converts to what
-          zest info <file>                 identify a file and its routes
+          kuori convert <in> <out>          two-file form, target inferred from <out>
+          kuori formats                     what converts to what
+          kuori info <file>                 identify a file and its routes
         """)
     }
 

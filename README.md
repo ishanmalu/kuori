@@ -1,11 +1,11 @@
-# Zest
+# Kuori
 
 A local file converter for macOS — a personal, faster, scriptable take on
-[Tangerine](https://tangerineformac.com/). Menu-bar app plus a `zest` CLI that
+[Tangerine](https://tangerineformac.com/). Menu-bar app plus a `kuori` CLI that
 share one conversion engine. Nothing is uploaded anywhere.
 
 Built the same way as [Perch](https://github.com/ishanmalu/perch): Swift + AppKit,
-SwiftPM, **no Xcode**, ad-hoc-signed. Safety checks run as `Zest --selftest`
+SwiftPM, **no Xcode**, ad-hoc-signed. Safety checks run as `Kuori --selftest`
 (XCTest isn't in the Command Line Tools SDK).
 
 ## Status
@@ -29,20 +29,20 @@ and background removal, universal build + DMG. See the plan in the project notes
 ## Build & run
 
 ```sh
-swift run Zest --selftest          # graph + arg-builder checks
-Scripts/build-app.sh 0.1.0         # -> dist/Zest.app (arm64, ad-hoc signed)
-open dist/Zest.app                 # menu-bar icon -> "Drop Zone"
+swift run Kuori --selftest          # graph + arg-builder checks
+Scripts/build-app.sh 0.1.0         # -> dist/Kuori.app (arm64, ad-hoc signed)
+open dist/Kuori.app                 # menu-bar icon -> "Drop Zone"
 ```
 
 ## CLI
 
 ```sh
-zest convert photo.png --to webp --quality 80
-zest convert clip.mov --to gif --scale 600x
-zest convert *.jpg --to pdf --out ~/Desktop
-zest convert in.png out.avif        # target inferred from the output name
-zest formats                        # what converts to what
-zest info movie.mkv
+kuori convert photo.png --to webp --quality 80
+kuori convert clip.mov --to gif --scale 600x
+kuori convert *.jpg --to pdf --out ~/Desktop
+kuori convert in.png out.avif        # target inferred from the output name
+kuori formats                        # what converts to what
+kuori info movie.mkv
 ```
 
 `--strip` removes metadata where the engine supports it. Collisions get a
@@ -59,7 +59,7 @@ Scripts/build-app.sh 0.1.0
 ```
 
 Engine licenses live in `LICENSES/`. LibreOffice is downloaded on first use into
-`~/Library/Application Support/Zest/engine`, never shipped in the bundle.
+`~/Library/Application Support/Kuori/engine`, never shipped in the bundle.
 
 ## License
 

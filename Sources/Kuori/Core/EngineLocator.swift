@@ -2,7 +2,7 @@ import Foundation
 
 /// Resolves an `EngineID` to an absolute executable path.
 ///
-/// Order: binary bundled inside `Zest.app/Contents/Resources/engine/`, then an
+/// Order: binary bundled inside `Kuori.app/Contents/Resources/engine/`, then an
 /// on-demand engine under Application Support (LibreOffice is fetched there on
 /// first use), then `PATH` and the usual Homebrew prefixes for dev machines.
 enum EngineLocator {
@@ -14,7 +14,7 @@ enum EngineLocator {
 
     static var supportEngineDir: URL {
         FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/Zest/engine", isDirectory: true)
+            .appendingPathComponent("Library/Application Support/Kuori/engine", isDirectory: true)
     }
 
     static func path(for id: EngineID) -> String? {

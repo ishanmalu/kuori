@@ -2,11 +2,11 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleName</key><string>Zest</string>
-    <key>CFBundleDisplayName</key><string>Zest</string>
-    <key>CFBundleExecutable</key><string>Zest</string>
-    <key>CFBundleIdentifier</key><string>com.ishanmalu.zest</string>
-    <key>CFBundleIconFile</key><string>Zest</string>
+    <key>CFBundleName</key><string>Kuori</string>
+    <key>CFBundleDisplayName</key><string>Kuori</string>
+    <key>CFBundleExecutable</key><string>Kuori</string>
+    <key>CFBundleIdentifier</key><string>com.ishanmalu.kuori</string>
+    <key>CFBundleIconFile</key><string>Kuori</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleShortVersionString</key><string>__VERSION__</string>
     <key>CFBundleVersion</key><string>__VERSION__</string>
@@ -18,9 +18,9 @@
     <array>
         <dict>
             <key>NSMenuItem</key>
-            <dict><key>default</key><string>Convert with Zest…</string></dict>
+            <dict><key>default</key><string>Convert with Kuori…</string></dict>
             <key>NSMessage</key><string>convertFiles</string>
-            <key>NSPortName</key><string>Zest</string>
+            <key>NSPortName</key><string>Kuori</string>
             <key>NSRequiredContext</key><dict/>
             <key>NSSendTypes</key>
             <array><string>public.file-url</string><string>NSFilenamesPboardType</string></array>

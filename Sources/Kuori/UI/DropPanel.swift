@@ -54,7 +54,7 @@ private final class DropView: NSView {
     private let subline = NSTextField(labelWithString: "images · video · audio · documents · archives")
     private let grid = NSStackView()
     private let status = NSTextField(labelWithString: "")
-    private let queue = DispatchQueue(label: "zest.convert", qos: .userInitiated, attributes: .concurrent)
+    private let queue = DispatchQueue(label: "kuori.convert", qos: .userInitiated, attributes: .concurrent)
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)

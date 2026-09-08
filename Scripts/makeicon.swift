@@ -1,8 +1,17 @@
 #!/usr/bin/env swift
-// Draws the Zest app icon at every size macOS asks for and emits an .iconset.
+// Draws the Kuori app icon at every size macOS asks for and emits an .iconset.
 // Pure AppKit so the repo needs no design tooling to rebuild the artwork.
-// A citrus wedge on a dark squircle: the "zest" is the bright rind arc.
+//
+// "Kuori" is Finnish for peel / rind. The mark is one strip of citrus peel
+// pared away in a curl — thick at the cut base, tapering to a loose tip — with
+// the bare fruit at its centre. A whole thing turned into another form.
 import AppKit
+
+func rot90(_ v: CGVector) -> CGVector { CGVector(dx: -v.dy, dy: v.dx) }
+func norm(_ v: CGVector) -> CGVector {
+    let m = max(sqrt(v.dx * v.dx + v.dy * v.dy), 0.0001)
+    return CGVector(dx: v.dx / m, dy: v.dy / m)
+}
 
 func drawIcon(size s: CGFloat) -> NSImage {
     let image = NSImage(size: NSSize(width: s, height: s))
@@ -10,57 +19,78 @@ func drawIcon(size s: CGFloat) -> NSImage {
     let ctx = NSGraphicsContext.current!.cgContext
     let rect = CGRect(x: 0, y: 0, width: s, height: s)
 
+    // Dark squircle ground.
     let squircle = NSBezierPath(roundedRect: rect.insetBy(dx: s * 0.055, dy: s * 0.055),
                                 xRadius: s * 0.225, yRadius: s * 0.225)
     ctx.saveGState()
     squircle.addClip()
-    NSGradient(colors: [NSColor(calibratedWhite: 0.14, alpha: 1),
+    NSGradient(colors: [NSColor(calibratedWhite: 0.16, alpha: 1),
                         NSColor(calibratedWhite: 0.06, alpha: 1)])!.draw(in: rect, angle: -90)
 
-    let cx = s * 0.5, cy = s * 0.46
-    let r = s * 0.34
+    let c = CGPoint(x: s * 0.5, y: s * 0.505)
 
-    // flesh wedge
-    NSColor(calibratedRed: 1.0, green: 0.58, blue: 0.13, alpha: 1).setFill()
-    let wedge = NSBezierPath()
-    wedge.move(to: CGPoint(x: cx, y: cy))
-    wedge.appendArc(withCenter: CGPoint(x: cx, y: cy), radius: r,
-                    startAngle: 20, endAngle: 160)
-    wedge.close()
-    wedge.fill()
+    // Centreline of the peel: a loose spiral, a bit over one turn.
+    let turns = 1.28
+    let thetaMax = CGFloat(turns * 2 * .pi)
+    let rStart = s * 0.360          // cut base, outer
+    let rEnd   = s * 0.140          // loose tip, near the fruit
+    let hwBase = s * 0.058          // half-width at the base
+    let hwTip  = s * 0.016          // half-width at the tip
+    let startAngle: CGFloat = .pi * 0.62   // where the cut sits (upper-left)
 
-    // segment lines
-    NSColor(calibratedWhite: 0.06, alpha: 1).setStroke()
-    for a in stride(from: 35.0, through: 145.0, by: 27.5) {
-        let p = NSBezierPath()
-        p.lineWidth = s * 0.012
-        p.move(to: CGPoint(x: cx, y: cy))
-        p.line(to: CGPoint(x: cx + cos(a * .pi / 180) * r, y: cy + sin(a * .pi / 180) * r))
-        p.stroke()
+    let n = 260
+    func centre(_ t: CGFloat) -> CGPoint {
+        let theta = startAngle + thetaMax * t
+        let r = rStart - (rStart - rEnd) * t
+        return CGPoint(x: c.x + cos(theta) * r, y: c.y + sin(theta) * r)
+    }
+    var outer: [CGPoint] = [], inner: [CGPoint] = [], mid: [CGPoint] = []
+    for i in 0...n {
+        let t = CGFloat(i) / CGFloat(n)
+        let p = centre(t)
+        let ahead = centre(min(1, t + 0.004)), back = centre(max(0, t - 0.004))
+        let nrm = norm(rot90(CGVector(dx: ahead.x - back.x, dy: ahead.y - back.y)))
+        let hw = hwBase + (hwTip - hwBase) * pow(t, 0.85)
+        outer.append(CGPoint(x: p.x + nrm.dx * hw, y: p.y + nrm.dy * hw))
+        inner.append(CGPoint(x: p.x - nrm.dx * hw, y: p.y - nrm.dy * hw))
+        mid.append(p)
     }
 
-    // bright rind arc — the "zest"
-    NSColor(calibratedRed: 1.0, green: 0.80, blue: 0.28, alpha: 1).setStroke()
-    let rind = NSBezierPath()
-    rind.lineWidth = s * 0.05
-    rind.lineCapStyle = .round
-    rind.appendArc(withCenter: CGPoint(x: cx, y: cy), radius: r * 1.12,
-                   startAngle: 18, endAngle: 162)
-    rind.stroke()
+    // Rind body — filled ribbon (outer edge forward, round the tip, inner edge back).
+    let ribbon = NSBezierPath()
+    ribbon.move(to: outer[0])
+    for p in outer.dropFirst() { ribbon.line(to: p) }
+    for p in inner.reversed() { ribbon.line(to: p) }
+    ribbon.close()
+    ctx.saveGState()
+    ribbon.addClip()
+    NSGradient(colors: [NSColor(calibratedRed: 1.00, green: 0.64, blue: 0.16, alpha: 1),
+                        NSColor(calibratedRed: 0.97, green: 0.47, blue: 0.06, alpha: 1)])!
+        .draw(in: rect, angle: -60)
+    ctx.restoreGState()
 
-    // conversion arrows below the wedge
-    NSColor.white.withAlphaComponent(0.92).setStroke()
-    let arr = NSBezierPath()
-    arr.lineWidth = s * 0.030
-    arr.lineCapStyle = .round
-    arr.lineJoinStyle = .round
-    let ay = s * 0.24
-    arr.move(to: CGPoint(x: s * 0.34, y: ay + s * 0.05))
-    arr.line(to: CGPoint(x: s * 0.66, y: ay + s * 0.05))
-    arr.move(to: CGPoint(x: s * 0.60, y: ay + s * 0.10))
-    arr.line(to: CGPoint(x: s * 0.66, y: ay + s * 0.05))
-    arr.line(to: CGPoint(x: s * 0.60, y: ay))
-    arr.stroke()
+    // Pith: a thin pale line hugging the inner edge.
+    let pith = NSBezierPath()
+    pith.lineWidth = max(1, s * 0.012)
+    pith.lineCapStyle = .round
+    pith.lineJoinStyle = .round
+    pith.move(to: inner[0])
+    for p in inner.dropFirst() { pith.line(to: p) }
+    NSColor(calibratedRed: 1.00, green: 0.90, blue: 0.66, alpha: 0.92).setStroke()
+    pith.stroke()
+
+    // Bare fruit at the centre, sitting just inside the tip of the peel.
+    let fr = s * 0.083
+    NSColor(calibratedRed: 1.00, green: 0.89, blue: 0.68, alpha: 1).setFill()
+    NSBezierPath(ovalIn: CGRect(x: c.x - fr, y: c.y - fr, width: fr * 2, height: fr * 2)).fill()
+    let seg = NSBezierPath()
+    seg.lineWidth = max(0.75, s * 0.008)
+    NSColor(calibratedRed: 0.90, green: 0.58, blue: 0.18, alpha: 0.55).setStroke()
+    for a in stride(from: 0.0, to: 180.0, by: 30.0) {
+        seg.move(to: CGPoint(x: c.x - cos(a * .pi / 180) * fr, y: c.y - sin(a * .pi / 180) * fr))
+        seg.line(to: CGPoint(x: c.x + cos(a * .pi / 180) * fr, y: c.y + sin(a * .pi / 180) * fr))
+    }
+    seg.stroke()
 
     ctx.restoreGState()
     image.unlockFocus()
@@ -68,7 +98,7 @@ func drawIcon(size s: CGFloat) -> NSImage {
 }
 
 let outDir = CommandLine.arguments.count > 1 ? CommandLine.arguments[1] : "Resources"
-let setDir = "\(outDir)/Zest.iconset"
+let setDir = "\(outDir)/Kuori.iconset"
 try? FileManager.default.createDirectory(atPath: setDir, withIntermediateDirectories: true)
 
 let specs: [(String, CGFloat)] = [
