@@ -1,0 +1,7 @@
+.build/
+dist/
+*.dmg
+.DS_Store
+Resources/Zest.iconset/
+Resources/Zest.icns
+Resources/engine/
