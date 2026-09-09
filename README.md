@@ -46,9 +46,11 @@ petals. Monochrome, keyboard-driven:
 ← → move    ↵ run    ⌥ Tools    ⇥ cycle Convert / Tools / Recipes    esc
 ```
 
-Click a petal or arrow to it and press ↵. Drops and ⌘V both load files. Runs
-happen on a background queue with a progress readout and auto-dismiss on
-success.
+**Hold Shift and drag a file out of Finder** and the wheel appears under the
+cursor — release it on a petal to convert. (A `DragMonitor` watching mouse
+events; no Accessibility permission needed.) It also opens from the menu bar,
+a ⌘V paste, or the "Convert with Kuori…" Finder Service. Runs happen on a
+background queue with a progress readout and auto-dismiss on success.
 
 ## Build & run
 
