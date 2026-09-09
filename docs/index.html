@@ -21,7 +21,7 @@
   --panel-2:rgba(255,255,255,.05);
   --ink:#f4f7f5;
   --mute:#8b948f;
-  --faint:#5d655f;
+  --faint:#727c75;
   --line:rgba(244,247,245,.09);
   --max:1120px;
   --r:16px;
@@ -96,7 +96,7 @@ kbd{font:600 12.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--i
   padding:11px 26px; border-radius:12px; font-size:15px; font-weight:640;
   transition:.2s; box-shadow:0 0 34px -8px var(--accent)}
 .btn:hover{transform:translateY(-2px); box-shadow:0 0 46px -6px var(--accent)}
-.btn span{font-size:11px; font-weight:500; opacity:.62; letter-spacing:.02em}
+.btn span{font-size:11px; font-weight:500; opacity:.78; letter-spacing:.02em}
 .btn.ghost{background:transparent; color:var(--ink); border-color:var(--line);
   box-shadow:none; justify-content:center; padding:11px 22px}
 .btn.ghost:hover{border-color:var(--accent-line); color:var(--accent)}
@@ -122,9 +122,38 @@ kbd{font:600 12.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--i
 .caption b{color:var(--mute); font-weight:500}
 
 /* ── reveal ────────────────────────────────────────────────── */
-.rv{opacity:0; transform:translateY(22px); transition:opacity .7s cubic-bezier(.2,.7,.3,1), transform .7s cubic-bezier(.2,.7,.3,1)}
+.rv{opacity:0; transform:translateY(22px) scale(.985);
+  transition:opacity .7s cubic-bezier(.2,.7,.3,1), transform .7s cubic-bezier(.2,.7,.3,1),
+             filter .9s cubic-bezier(.2,.7,.3,1)}
 .rv.in{opacity:1; transform:none}
-@media (prefers-reduced-motion:reduce){.rv{opacity:1; transform:none} .dot{animation:none}}
+
+/* Bloom: as a block arrives it carries a short pollen-coloured glow that
+   burns off. Two layers — a blur on the element itself, and a radial wash
+   behind it — because a filter alone reads as blurry rather than lit. The
+   wash is a pseudo-element so it never affects layout, and it is removed
+   from the flow entirely once spent. */
+.bloom{position:relative}
+.bloom::after{
+  content:""; position:absolute; inset:-14% -8%; z-index:-1; pointer-events:none;
+  border-radius:36px; opacity:0;
+  background:radial-gradient(60% 60% at 50% 45%, var(--accent) 0%, transparent 70%);
+}
+.bloom.in{animation:bloom-lit 1.15s cubic-bezier(.2,.7,.3,1) both}
+.bloom.in::after{animation:bloom-wash 1.15s cubic-bezier(.2,.7,.3,1) both}
+@keyframes bloom-lit{
+  0%{filter:brightness(1.5) saturate(1.35) blur(5px)}
+  45%{filter:brightness(1.14) saturate(1.12) blur(0)}
+  100%{filter:none}
+}
+@keyframes bloom-wash{
+  0%{opacity:0; transform:scale(.82)}
+  30%{opacity:.20}
+  100%{opacity:0; transform:scale(1.06)}
+}
+@media (prefers-reduced-motion:reduce){
+  .rv{opacity:1; transform:none} .dot{animation:none}
+  .bloom.in,.bloom.in::after{animation:none}
+}
 
 /* ── sections ──────────────────────────────────────────────── */
 section{padding:110px 0}
@@ -196,11 +225,11 @@ footer{border-top:1px solid var(--line); padding:48px 0 60px; color:var(--faint)
 /* Deliberately quiet — present for anyone who looks, never a pitch. */
 .coffee{margin:14px 0 0}
 .coffee a{display:inline-flex; align-items:center; gap:5px;
-  font-size:12px; color:var(--faint); opacity:.75}
+  font-size:12px; color:var(--mute); opacity:.85}
 .coffee a:hover{color:var(--mute); opacity:1; text-decoration:none}
 .coffee svg{width:13px; height:13px; fill:none; stroke:currentColor;
   stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round}
-.peel{margin:26px 0 0; color:var(--faint); opacity:.8}
+.peel{margin:26px 0 0; color:var(--mute); opacity:.92}
 
 @media (max-width:880px){
   .bento{grid-template-columns:repeat(2,1fr)}
@@ -232,14 +261,14 @@ footer{border-top:1px solid var(--line); padding:48px 0 60px; color:var(--faint)
 <main>
 
 <div class="wrap hero">
-  <span class="pill"><b><i class="dot"></i> v0.6.0</b> · macOS 14+ · Universal</span>
+  <span class="pill"><b><i class="dot"></i> v0.6.1</b> · macOS 14+ · Universal</span>
   <h1>The converter that<br><span class="grad">comes to you.</span></h1>
   <p class="lede">Hold Shift, drag a file, drop it on a petal. Daisy puts a wheel of every
     format that file can become right where you are — and converts it on your Mac,
     without uploading a thing.</p>
   <div class="actions">
     <a class="btn" href="https://github.com/ishanmalu/daisy/releases/latest">Download for Mac
-      <span>0.6.0 · Universal · 9.5 MB</span></a>
+      <span>0.6.1 · Universal · 9.5 MB</span></a>
     <a class="btn ghost" href="https://github.com/ishanmalu/daisy">View source</a>
   </div>
   <div class="keys">
@@ -289,8 +318,9 @@ footer{border-top:1px solid var(--line); padding:48px 0 60px; color:var(--faint)
   <div class="wrap">
     <p class="eyebrow rv">Formats</p>
     <h2 class="rv">Everything you actually hit.</h2>
-    <p class="sub rv">Nine conversion engines are bundled inside the app, so it works on a
-      machine with nothing installed — no Homebrew, no Python, no first-run download.</p>
+    <p class="sub rv">Images, PDFs, OCR and background removal are native — they work on a
+      bare Mac with nothing installed. Video, audio and documents lean on tools Daisy
+      can't legally redistribute, so those want one <code class="mono">brew install</code>.</p>
     <div class="tbl rv">
       <table>
         <thead><tr><th>Class</th><th>Converts</th><th>Engine</th></tr></thead>
@@ -429,7 +459,7 @@ footer{border-top:1px solid var(--line); padding:48px 0 60px; color:var(--faint)
       for any noncommercial use, source and all — Swift and AppKit, SwiftPM, no Xcode
       project, safety checks inside the binary.</p>
     <div class="actions rv" style="justify-content:flex-start; margin:0 0 30px">
-      <a class="btn" href="https://github.com/ishanmalu/daisy/releases/latest">Download 0.6.0
+      <a class="btn" href="https://github.com/ishanmalu/daisy/releases/latest">Download 0.6.1
         <span>macOS 14+ · Intel &amp; Apple Silicon</span></a>
     </div>
     <div class="rv">
@@ -438,7 +468,7 @@ footer{border-top:1px solid var(--line); padding:48px 0 60px; color:var(--faint)
 cd daisy
 swift run Daisy <span class="s">--selftest</span>        <span class="c"># 63 graph + logic checks</span>
 Scripts/bundle-engines.sh         <span class="c"># vendor cwebp, qpdf, resvg, …</span>
-Scripts/build-app.sh 0.6.0        <span class="c"># → dist/Daisy.app</span></pre>
+Scripts/build-app.sh 0.6.1        <span class="c"># → dist/Daisy.app</span></pre>
     </div>
     <div class="note rv" style="margin-top:24px">
       <span style="color:var(--accent)">◆</span>
@@ -539,8 +569,12 @@ Scripts/build-app.sh 0.6.0        <span class="c"># → dist/Daisy.app</span></p
   const io = new IntersectionObserver((es) => es.forEach(e => {
     if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
   }), { rootMargin: "0px 0px -8% 0px" });
+  const bloomable = n => !n.closest("pre") && !n.matches("pre");
   document.querySelectorAll(".rv").forEach((n, i) => {
-    n.style.transitionDelay = `${Math.min(i % 6, 5) * 55}ms`;
+    const d = Math.min(i % 6, 5) * 55;
+    n.style.transitionDelay = `${d}ms`;
+    // Code blocks keep their crisp edges; a blur on monospace is just mush.
+    if (bloomable(n)) { n.classList.add("bloom"); n.style.animationDelay = `${d}ms`; }
     io.observe(n);
   });
   // Failsafe: if the observer never fires (background tab, odd embed), show it anyway.

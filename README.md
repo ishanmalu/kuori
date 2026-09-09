@@ -131,7 +131,7 @@ brew install webp qpdf sevenzip unar resvg
 Scripts/bundle-engines.sh             # copies the binaries, then collect-dylibs.py
                                       #   vendors the dylibs into Resources/engine/libs/
                                       #   and rewrites install names to @loader_path
-Scripts/build-app.sh 0.6.0
+Scripts/build-app.sh 0.6.1
 ```
 
 The bundled set is deliberately GPL-free, so the DMG carries no source-offer

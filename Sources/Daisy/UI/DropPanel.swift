@@ -9,8 +9,13 @@ final class DropPanel: NSPanel {
 
     private let hud = WheelHUD()
 
+    /// The window is deliberately larger than the disc. The extra ring is where
+    /// the opening bloom and the drop shadow live — at the old 300pt both were
+    /// clipped flat against the window edge.
+    static let side: CGFloat = 360
+
     private init() {
-        super.init(contentRect: NSRect(x: 0, y: 0, width: 300, height: 300),
+        super.init(contentRect: NSRect(x: 0, y: 0, width: Self.side, height: Self.side),
                    styleMask: [.borderless, .nonactivatingPanel],
                    backing: .buffered, defer: true)
         isFloatingPanel = true
@@ -25,32 +30,35 @@ final class DropPanel: NSPanel {
         // the disc, with the HUD's own translucent fills painted on top. The
         // mask is what keeps the blur circular — a rounded-rect layer mask
         // would be ignored by the behind-window blur.
-        let blur = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: 300, height: 300))
+        let bounds = NSRect(x: 0, y: 0, width: Self.side, height: Self.side)
+        let blur = NSVisualEffectView(frame: bounds)
         blur.material = .hudWindow
         blur.blendingMode = .behindWindow
         blur.state = .active
-        blur.maskImage = Self.circleMask(diameter: WheelHUD.discDiameter)
-        blur.autoresizingMask = [.width, .height]
+        blur.maskImage = Self.circleMask(side: Self.side, diameter: WheelHUD.discDiameter)
 
-        hud.frame = blur.bounds
-        hud.autoresizingMask = [.width, .height]
-        blur.addSubview(hud)
-        contentView = blur
+        // An unmasked container holds everything. The blur has to carry the
+        // circular mask itself, and anything parented to it gets clipped by that
+        // mask too — which is where the bloom went the first time.
+        let container = NSView(frame: bounds)
+        container.wantsLayer = true
+        container.addSubview(blur)
+        hud.frame = bounds
+        container.addSubview(hud)
+        contentView = container
         hud.owner = self
     }
 
-    /// A centred circle the blur view stretches around. Drawn with a cap inset
-    /// so AppKit's nine-part stretching leaves the curve alone.
-    private static func circleMask(diameter d: CGFloat) -> NSImage {
-        let image = NSImage(size: NSSize(width: d, height: d), flipped: false) { rect in
+    /// A circle of `diameter` centred in a `side` square. Fixed size with no cap
+    /// insets: the window never resizes, and stretching a circle that has to stay
+    /// concentric with the drawing on top of it is asking for a seam.
+    private static func circleMask(side: CGFloat, diameter d: CGFloat) -> NSImage {
+        NSImage(size: NSSize(width: side, height: side), flipped: false) { _ in
             NSColor.black.setFill()
-            NSBezierPath(ovalIn: rect).fill()
+            let o = (side - d) / 2
+            NSBezierPath(ovalIn: NSRect(x: o, y: o, width: d, height: d)).fill()
             return true
         }
-        image.capInsets = NSEdgeInsets(top: d / 2 - 1, left: d / 2 - 1,
-                                       bottom: d / 2 - 1, right: d / 2 - 1)
-        image.resizingMode = .stretch
-        return image
     }
 
     override var canBecomeKey: Bool { true }
@@ -84,13 +92,35 @@ final class DropPanel: NSPanel {
         if fresh { playEntrance() }
     }
 
-    /// A short rise into place. The window fades while the content scales up
-    /// from just under full size — enough to read as arriving rather than
-    /// blinking on, and short enough that it never delays a drop.
+    /// A short rise into place with a bloom: the flower's own yellow flares out
+    /// past the rim and burns off while the disc scales up. The glow lives in a
+    /// layer of its own so it can overflow the disc — which is the whole reason
+    /// the window is bigger than the wheel.
     private func playEntrance() {
-        guard let layer = contentView?.layer else { return }
+        guard let content = contentView, let layer = content.layer else { return }
         alphaValue = 0
         layer.transform = CATransform3DMakeScale(0.90, 0.90, 1)
+
+        let bloom = CALayer()
+        let r = WheelHUD.discDiameter / 2 + 58
+        bloom.frame = CGRect(x: content.bounds.midX - r, y: content.bounds.midY - r,
+                             width: r * 2, height: r * 2)
+        bloom.contents = Self.bloomImage(diameter: r * 2)
+        bloom.opacity = 0
+        layer.addSublayer(bloom)
+
+        let flare = CAKeyframeAnimation(keyPath: "opacity")
+        flare.values = [0, 0.85, 0]
+        flare.keyTimes = [0, 0.28, 1]
+        flare.duration = 0.62
+        let spread = CABasicAnimation(keyPath: "transform.scale")
+        spread.fromValue = 0.72
+        spread.toValue = 1.18
+        spread.duration = 0.62
+        spread.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        bloom.add(flare, forKey: "flare")
+        bloom.add(spread, forKey: "spread")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.62) { bloom.removeFromSuperlayer() }
 
         NSAnimationContext.runAnimationGroup { ctx in
             ctx.duration = 0.20
@@ -99,6 +129,29 @@ final class DropPanel: NSPanel {
             animator().alphaValue = 1
             layer.transform = CATransform3DIdentity
         }
+    }
+
+    /// The bloom is a ring, not a filled circle. The disc is opaque, so a glow
+    /// that peaks in the middle is almost entirely hidden behind it — the light
+    /// has to peak where the rim is and fall away outwards.
+    ///
+    /// `NSGradient`'s radial draw rather than a `CAGradientLayer` because the
+    /// layer version bands visibly at this size.
+    private static func bloomImage(diameter d: CGFloat) -> CGImage? {
+        let rimStop = (WheelHUD.discDiameter / 2) / (d / 2)
+        let image = NSImage(size: NSSize(width: d, height: d), flipped: false) { rect in
+            let mid = CGPoint(x: rect.midX, y: rect.midY)
+            NSGradient(colors: [Theme.accent.withAlphaComponent(0.30),
+                                Theme.accent.withAlphaComponent(0.45),
+                                Theme.accent.withAlphaComponent(0.95),
+                                Theme.accent.withAlphaComponent(0)],
+                       atLocations: [0, rimStop - 0.22, rimStop, 1],
+                       colorSpace: .sRGB)?
+                .draw(fromCenter: mid, radius: 0, toCenter: mid, radius: rect.width / 2,
+                      options: [])
+            return true
+        }
+        return image.cgImage(forProposedRect: nil, context: nil, hints: nil)
     }
 
     private static func clipboardFiles() -> [URL]? {

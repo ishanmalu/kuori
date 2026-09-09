@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.6.1
+
+- **The wheel blooms open.** A ring of accent light flares past the rim and
+  burns off in about half a second as the disc scales up. It's a ring rather
+  than a filled glow because the disc is opaque — a bloom that peaks in the
+  middle is hidden behind it, so the light peaks at the rim instead. The window
+  grew from 300 to 360pt to give it somewhere to go, and the blur, which carries
+  the circular mask, moved into an unmasked container: anything parented to a
+  masked view gets clipped by that mask too.
+- **Bloom on the site as well**, on scroll reveal — a brief brightness-and-blur
+  on each block plus a radial wash behind it. Code blocks are excluded; blurred
+  monospace is just mush.
+- **Contrast pass.** Every text node on the site now clears WCAG AA. `--faint`
+  was 3.31:1 against the page and used all over, and the download button's
+  subtitle was 3.66:1 dark-on-yellow. Both fixed, along with the footer tagline
+  and the coffee link.
+- Fix: the formats section still claimed nine engines are bundled and that
+  nothing needs installing. Neither has been true since 0.4.0.
+
 ## 0.6.0 — Daisy
 
 Kuori is now **Daisy**. The name was a Finnish pun on *peel*, inherited from
