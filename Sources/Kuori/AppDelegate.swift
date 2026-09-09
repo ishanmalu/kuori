@@ -9,7 +9,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         WatchFolders.shared.load()
         WatchFolders.shared.start()
         DragMonitor.shared.start()
-        Hotkey.register { DropPanel.shared.showAtCursor() }
+        Hotkey.register { DropPanel.shared.summon() }
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
@@ -38,7 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        DropPanel.shared.showCentered()
+        DropPanel.shared.summon()
         return true
     }
 

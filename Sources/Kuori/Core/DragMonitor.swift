@@ -24,12 +24,12 @@ final class DragMonitor {
         switch e.type {
         case .leftMouseDragged:
             // A background process can't read the drag pasteboard, so we can't
-            // tell yet whether files are being dragged. Show the wheel under the
-            // cursor; it reads the drag once it enters the window, and dismisses
-            // itself if nothing does.
+            // tell yet whether files are being dragged. Put the wheel up in the
+            // middle; it reads the drag once that enters the window, and
+            // dismisses itself if nothing does.
             guard !summoning, NSEvent.modifierFlags.contains(.shift) else { return }
             summoning = true
-            DispatchQueue.main.async { DropPanel.shared.beginDrop(at: NSEvent.mouseLocation) }
+            DispatchQueue.main.async { DropPanel.shared.beginDrop() }
 
         case .leftMouseUp:
             guard summoning else { return }

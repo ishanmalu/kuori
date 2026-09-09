@@ -15,9 +15,10 @@ if let verb = args.first, cliVerbs.contains(verb) {
 }
 
 let app = NSApplication.shared
-let delegate = AppDelegate()
-app.delegate = delegate
 app.setActivationPolicy(.accessory)
+
+// The delegate brings up the status item, watch folders and the hotkey, so the
+// two diagnostic modes below deliberately run without it.
 
 // `--shot-ui <out.png> [dark] [tools|recipes]` renders the wheel to a file and quits.
 if let i = args.firstIndex(of: "--shot-ui") {
@@ -25,8 +26,10 @@ if let i = args.firstIndex(of: "--shot-ui") {
     app.appearance = NSAppearance(named: args.contains("dark") ? .darkAqua : .aqua)
     let panel = DropPanel.shared
     panel.showCentered()
-    panel.load(urls: [URL(fileURLWithPath: "/tmp/holiday.png"),
-                      URL(fileURLWithPath: "/tmp/logo.jpg")])
+    if !args.contains("blank") {
+        panel.load(urls: [URL(fileURLWithPath: "/tmp/holiday.png"),
+                          URL(fileURLWithPath: "/tmp/logo.jpg")])
+    }
     if args.contains("tools") { panel.previewMode("tools") }
     if args.contains("recipes") { panel.previewMode("recipes") }
     DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
@@ -71,12 +74,14 @@ if args.first == "--drag-probe" {
     app.run()
 }
 
+let delegate = AppDelegate()
+app.delegate = delegate
+
 // `--show <files…>` opens the wheel live and stays up.
 if let i = args.firstIndex(of: "--show") {
     let paths = Array(args[(i + 1)...])
     let urls = paths.isEmpty ? [URL(fileURLWithPath: "/tmp/a.png")] : paths.map { URL(fileURLWithPath: $0) }
     DispatchQueue.main.async { DropPanel.shared.load(urls: urls) }
-    app.run()
 }
 
 app.run()

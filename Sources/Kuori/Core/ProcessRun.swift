@@ -48,9 +48,14 @@ enum ProcessRun {
             return ProcessOutcome(code: -1, stdout: "", stderr: "launch failed: \(error.localizedDescription)")
         }
 
-        var timedOut = false
+        // `killed` is touched from both the timer queue and this one.
+        let killedLock = NSLock()
+        var killed = false
         if let timeout {
-            let deadline = DispatchWorkItem { timedOut = true; p.terminate() }
+            let deadline = DispatchWorkItem {
+                killedLock.lock(); killed = true; killedLock.unlock()
+                p.terminate()
+            }
             DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: deadline)
             p.waitUntilExit()
             deadline.cancel()
@@ -58,6 +63,7 @@ enum ProcessRun {
             p.waitUntilExit()
         }
         readers.wait()
+        killedLock.lock(); let timedOut = killed; killedLock.unlock()
 
         return ProcessOutcome(
             code: timedOut ? 124 : p.terminationStatus,

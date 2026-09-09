@@ -26,21 +26,25 @@ final class DropPanel: NSPanel {
 
     override var canBecomeKey: Bool { true }
 
-    func toggle() { isVisible ? orderOut(nil) : showAtCursor() }
+    func toggle() { isVisible ? orderOut(nil) : summon() }
 
-    func showCentered() {
-        if let vf = NSScreen.main?.visibleFrame {
-            setFrameOrigin(NSPoint(x: vf.midX - frame.width / 2, y: vf.midY - frame.height / 2 + 30))
-        }
+    /// Hotkey / menu summon. If files are on the clipboard it loads them;
+    /// otherwise it's an empty ring to drag a file onto.
+    func summon() {
+        centreOnScreen()
+        if let urls = Self.clipboardFiles() { hud.accept(urls) }
         present()
     }
 
-    /// Hotkey / menu summon — appears where the pointer is. If files are on the
-    /// clipboard it loads them; otherwise it's an empty ring to drag a file onto.
-    func showAtCursor() {
-        position(around: NSEvent.mouseLocation)
-        if let urls = Self.clipboardFiles() { hud.accept(urls) }
-        present()
+    func showCentered() { centreOnScreen(); present() }
+
+    /// The wheel always lands dead centre of the active screen — one place to
+    /// look for it, and a drag always has the same distance to travel.
+    private func centreOnScreen() {
+        let screen = NSScreen.screens.first { $0.frame.contains(NSEvent.mouseLocation) } ?? NSScreen.main
+        guard let vf = screen?.visibleFrame else { return }
+        setFrameOrigin(NSPoint(x: (vf.midX - frame.width / 2).rounded(),
+                               y: (vf.midY - frame.height / 2).rounded()))
     }
 
     private func present() {
@@ -63,34 +67,26 @@ final class DropPanel: NSPanel {
 
     private var dragDismiss: DispatchWorkItem?
 
-    /// From `DragMonitor`: a Shift-drag is in progress somewhere. Appear under
-    /// the cursor without taking focus. The HUD reads the dragged files once the
-    /// drag enters it; if none does within a beat, we vanish.
-    func beginDrop(at point: NSPoint) {
-        position(around: point)
+    /// From `DragMonitor`: a Shift-drag is in progress somewhere. Appear in the
+    /// middle without taking focus, so the drag keeps running. The HUD reads the
+    /// dragged files once the drag enters it; if none does, we vanish.
+    func beginDrop() {
+        centreOnScreen()
         hud.armForDrag()
         orderFront(nil)
 
+        // Mouse-up is what really dismisses this; the timer is only a backstop
+        // for a drag whose release we never see.
         dragDismiss?.cancel()
         let work = DispatchWorkItem { [weak self] in self?.dismissIfDragSummoned() }
         dragDismiss = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: work)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8, execute: work)
     }
 
     func cancelDragDismiss() { dragDismiss?.cancel(); dragDismiss = nil }
 
     func dismissIfDragSummoned() {
         if hud.dragSummoned { hud.dragSummoned = false; orderOut(nil) }
-    }
-
-    private func position(around p: NSPoint) {
-        var o = NSPoint(x: p.x - frame.width / 2, y: p.y - frame.height / 2)
-        let screen = NSScreen.screens.first { $0.frame.contains(p) } ?? NSScreen.main
-        if let vf = screen?.visibleFrame {
-            o.x = min(max(o.x, vf.minX + 8), vf.maxX - frame.width - 8)
-            o.y = min(max(o.y, vf.minY + 8), vf.maxY - frame.height - 8)
-        }
-        setFrameOrigin(o)
     }
 
     /// `--shot-ui` only.
@@ -121,6 +117,8 @@ private final class WheelHUD: NSView {
     private var presetParent: Tool?
     private var running = false
     private var progress = 0.0
+    private var errorText: String?
+    private var errorClear: DispatchWorkItem?
 
     private var center: CGPoint { CGPoint(x: bounds.midX, y: bounds.midY) }
     private let discR: CGFloat = 143
@@ -168,8 +166,21 @@ private final class WheelHUD: NSView {
         dragSummoned = true
     }
 
+    /// A conversion failed — say so on the wheel rather than only beeping.
+    /// The petals stay put so the same drop can be retried.
+    private func showError(_ message: String) {
+        errorText = message
+        needsDisplay = true
+        errorClear?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.errorText = nil; self?.needsDisplay = true }
+        errorClear = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4.5, execute: work)
+    }
+
     /// Back to the empty ring — after a conversion, or before a new drag.
     private func resetIdle() {
+        errorClear?.cancel()
+        errorText = nil
         inputs = []
         formats = []
         thumb = nil
@@ -322,9 +333,10 @@ private final class WheelHUD: NSView {
                 }
             } catch {
                 DispatchQueue.main.async {
-                    self?.running = false
-                    self?.progress = 0
-                    self?.needsDisplay = true
+                    guard let self else { return }
+                    self.running = false
+                    self.progress = 0
+                    self.showError(error.localizedDescription)
                     NSSound.beep()
                 }
             }
@@ -393,8 +405,10 @@ private final class WheelHUD: NSView {
             disc.setLineDash([6, 5], count: 2, phase: 0)
             Theme.neon.withAlphaComponent(0.4).setStroke()
             disc.stroke()
-            text("Drop", at: CGPoint(x: center.x, y: center.y + 9), 14, .semibold, Theme.ink)
-            text("files", at: CGPoint(x: center.x, y: center.y - 9), 14, .semibold, Theme.ink)
+            text("Drop", at: CGPoint(x: center.x, y: center.y + 14), 14, .semibold, Theme.ink)
+            text("files", at: CGPoint(x: center.x, y: center.y - 4), 14, .semibold, Theme.ink)
+            text("⌥ tools   ⇥ mode   esc", at: CGPoint(x: center.x, y: center.y - 30),
+                 9, .regular, Theme.inkFaint, tracking: 0.3)
             return
         }
 
@@ -410,7 +424,26 @@ private final class WheelHUD: NSView {
         } else {
             for i in items.indices { drawPetal(i) }
         }
-        drawHub()
+        if let errorText { drawToast(errorText) } else { drawHub() }
+    }
+
+    private func drawToast(_ message: String) {
+        let width: CGFloat = 210
+        let font = NSFont.systemFont(ofSize: 11, weight: .medium)
+        let para = NSMutableParagraphStyle()
+        para.alignment = .center
+        let str = NSAttributedString(string: message, attributes: [.font: font, .paragraphStyle: para])
+        let size = str.boundingRect(with: NSSize(width: width - 20, height: 120),
+                                    options: [.usesLineFragmentOrigin, .usesFontLeading]).size
+        let box = NSRect(x: center.x - width / 2, y: center.y - (size.height + 20) / 2,
+                         width: width, height: size.height + 20)
+        let card = NSBezierPath(roundedRect: box, xRadius: 10, yRadius: 10)
+        Theme.paper.setFill()
+        card.fill()
+        NSColor.systemRed.withAlphaComponent(0.55).setStroke()
+        card.lineWidth = 1
+        card.stroke()
+        text(message, at: CGPoint(x: box.midX, y: box.midY), 11, .medium, Theme.ink, maxWidth: width - 20)
     }
 
     /// Dark text that stays readable on a bright neon fill, in either appearance.
@@ -471,6 +504,13 @@ private final class WheelHUD: NSView {
             NSGraphicsContext.restoreGraphicsState()
         } else {
             text(sourceLabel(), at: CGPoint(x: center.x, y: center.y + 4), 12, .semibold, Theme.ink)
+        }
+        // Nothing else says which mode you're in, and the petals alone are ambiguous.
+        if mode != .convert {
+            let name = mode == .tools ? "TOOLS" : "RECIPES"
+            let colour = thumb == nil ? Theme.inkFaint : Theme.paper.withAlphaComponent(0.85)
+            text(name, at: CGPoint(x: center.x, y: center.y + hubR - 13), 8.5, .semibold,
+                 colour, tracking: 1)
         }
         Theme.hairline.setStroke()
         hub.lineWidth = 1
