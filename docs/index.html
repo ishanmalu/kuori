@@ -185,10 +185,22 @@ pre .c{color:var(--faint)} pre .k{color:var(--neon)} pre .s{color:var(--neon-2)}
 .note b{color:var(--ink); font-weight:600}
 
 /* footer */
-footer{border-top:1px solid var(--line); padding:44px 0 70px; color:var(--faint); font-size:13.5px}
-.foot{display:flex; gap:22px; flex-wrap:wrap; align-items:center}
-.foot a{color:var(--mute)} .foot a:hover{color:var(--neon)}
-.foot .sp{margin-left:auto}
+footer{border-top:1px solid var(--line); padding:48px 0 60px; color:var(--faint);
+  font-size:13.5px; text-align:center}
+.foot-links{display:flex; flex-wrap:wrap; gap:22px; justify-content:center}
+.foot-links a{color:var(--mute)}
+.foot-links a:hover{color:var(--ink); text-decoration:none}
+.made{margin:22px 0 0; color:var(--faint)}
+.made a{color:var(--mute); font-weight:560}
+.made a:hover{color:var(--neon); text-decoration:none}
+/* Deliberately quiet — present for anyone who looks, never a pitch. */
+.coffee{margin:14px 0 0}
+.coffee a{display:inline-flex; align-items:center; gap:5px;
+  font-size:12px; color:var(--faint); opacity:.75}
+.coffee a:hover{color:var(--mute); opacity:1; text-decoration:none}
+.coffee svg{width:13px; height:13px; fill:none; stroke:currentColor;
+  stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round}
+.peel{margin:26px 0 0; color:var(--faint); opacity:.8}
 
 @media (max-width:880px){
   .bento{grid-template-columns:repeat(2,1fr)}
@@ -220,14 +232,14 @@ footer{border-top:1px solid var(--line); padding:44px 0 70px; color:var(--faint)
 <main>
 
 <div class="wrap hero">
-  <span class="pill"><b><i class="dot"></i> v0.3.1</b> · macOS 14+ · Universal</span>
+  <span class="pill"><b><i class="dot"></i> v0.4.0</b> · macOS 14+ · Universal</span>
   <h1>The converter that<br><span class="grad">comes to you.</span></h1>
   <p class="lede">Hold Shift, drag a file, drop it on a petal. Kuori puts a wheel of every
     format that file can become right where you are — and converts it on your Mac,
     without uploading a thing.</p>
   <div class="actions">
     <a class="btn" href="https://github.com/ishanmalu/kuori/releases/latest">Download for Mac
-      <span>0.3.1 · Universal · 101 MB</span></a>
+      <span>0.4.0 · Universal · 9.3 MB</span></a>
     <a class="btn ghost" href="https://github.com/ishanmalu/kuori">View source</a>
   </div>
   <div class="keys">
@@ -417,7 +429,7 @@ footer{border-top:1px solid var(--line); padding:44px 0 70px; color:var(--faint)
       for any noncommercial use, source and all — Swift and AppKit, SwiftPM, no Xcode
       project, safety checks inside the binary.</p>
     <div class="actions rv" style="justify-content:flex-start; margin:0 0 30px">
-      <a class="btn" href="https://github.com/ishanmalu/kuori/releases/latest">Download 0.3.1
+      <a class="btn" href="https://github.com/ishanmalu/kuori/releases/latest">Download 0.4.0
         <span>macOS 14+ · Intel &amp; Apple Silicon</span></a>
     </div>
     <div class="rv">
@@ -443,12 +455,25 @@ Scripts/build-app.sh 0.4.0        <span class="c"># → dist/Kuori.app</span></p
 </main>
 
 <footer>
-  <div class="wrap foot">
-    <span>Kuori — Finnish for <em>peel</em>. You drop a file in and the format comes away.</span>
-    <span><a href="https://github.com/ishanmalu/kuori/releases/latest">Download</a></span>
-    <span class="sp"><a href="https://github.com/ishanmalu/kuori">Source</a></span>
-    <span><a href="https://github.com/ishanmalu/Perch">Perch</a></span>
-    <span><a href="https://ishanmalu.github.io">ishanmalu.github.io</a></span>
+  <div class="wrap">
+    <div class="foot-links">
+      <a href="https://github.com/ishanmalu/kuori">GitHub</a>
+      <a href="https://github.com/ishanmalu/kuori/releases">Releases</a>
+      <a href="https://github.com/ishanmalu/kuori/issues">Report an issue</a>
+      <a href="https://github.com/ishanmalu/kuori/blob/main/LICENSE">Noncommercial licence</a>
+    </div>
+    <p class="made">
+      By <a href="https://www.linkedin.com/in/ishanmalu/" target="_blank" rel="noopener">Ishan Malu</a>
+    </p>
+    <p class="coffee">
+      <a href="https://buymeacoffee.com/ishanmalu" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M4 9h13v6a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/>
+          <path d="M17 10h1.5a2.5 2.5 0 0 1 0 5H17"/><path d="M7 3v2M11 3v2"/>
+        </svg>Buy me a coffee
+      </a>
+    </p>
+    <p class="peel">Kuori — Finnish for <em>peel</em>. You drop a file in and the format comes away.</p>
   </div>
 </footer>
 
