@@ -26,15 +26,33 @@ final class DropPanel: NSPanel {
 
     override var canBecomeKey: Bool { true }
 
-    func toggle() { isVisible ? orderOut(nil) : showCentered() }
+    func toggle() { isVisible ? orderOut(nil) : showAtCursor() }
 
     func showCentered() {
         if let vf = NSScreen.main?.visibleFrame {
             setFrameOrigin(NSPoint(x: vf.midX - frame.width / 2, y: vf.midY - frame.height / 2 + 30))
         }
+        present()
+    }
+
+    /// Hotkey / menu summon — appears where the pointer is. If files are on the
+    /// clipboard it loads them; otherwise it's an empty ring to drag a file onto.
+    func showAtCursor() {
+        position(around: NSEvent.mouseLocation)
+        if let urls = Self.clipboardFiles() { hud.accept(urls) }
+        present()
+    }
+
+    private func present() {
         makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         makeFirstResponder(hud)
+    }
+
+    private static func clipboardFiles() -> [URL]? {
+        let urls = NSPasteboard.general.readObjects(forClasses: [NSURL.self],
+                   options: [.urlReadingFileURLsOnly: true]) as? [URL]
+        return (urls?.isEmpty ?? true) ? nil : urls
     }
 
     /// From the menu, Services, or a paste — an interactive open.

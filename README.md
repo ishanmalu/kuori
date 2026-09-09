@@ -46,11 +46,13 @@ petals. Monochrome, keyboard-driven:
 ← → move    ↵ run    ⌥ Tools    ⇥ cycle Convert / Tools / Recipes    esc
 ```
 
-**Hold Shift and drag a file out of Finder** and the wheel appears under the
-cursor — release it on a petal to convert. (A `DragMonitor` watching mouse
-events; no Accessibility permission needed.) It also opens from the menu bar,
-a ⌘V paste, or the "Convert with Kuori…" Finder Service. Runs happen on a
-background queue with a progress readout and auto-dismiss on success.
+**⌥⇧V** pops the wheel wherever the pointer is — permission-free, via a Carbon
+hotkey. If files are on the clipboard it loads them; otherwise drag one from
+Finder straight onto the ring. A `DragMonitor` also tries to summon it mid
+Shift-drag from Finder, where the OS allows a global mouse monitor
+(`Kuori --drag-probe` tells you). It also opens from the menu bar or the
+"Convert with Kuori…" Finder Service. Runs happen on a background queue with a
+progress readout and auto-dismiss on success.
 
 ## Build & run
 

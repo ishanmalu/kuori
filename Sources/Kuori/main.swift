@@ -42,6 +42,35 @@ if let i = args.firstIndex(of: "--shot-ui") {
     app.run()
 }
 
+// `--drag-probe` reports whether a global mouse-drag monitor gets events here.
+if args.first == "--drag-probe" {
+    app.setActivationPolicy(.prohibited)
+    var count = 0
+    _ = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .leftMouseDragged, .leftMouseUp]) { e in
+        switch e.type {
+        case .leftMouseDown:
+            print("click")
+        case .leftMouseDragged:
+            count += 1
+            if count % 15 == 1 {
+                let files = (NSPasteboard(name: .drag).readObjects(
+                    forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL] ?? [])
+                    .map { $0.lastPathComponent }
+                print("drag x\(count)  shift=\(NSEvent.modifierFlags.contains(.shift))  files=\(files)")
+            }
+        case .leftMouseUp:
+            if count > 0 { print("release (\(count) events)"); count = 0 }
+        default:
+            break
+        }
+    }
+    print("drag-probe armed — move the mouse, click, then drag a file for ~30s")
+    DispatchQueue.main.asyncAfter(deadline: .now() + 30) {
+        print("done"); exit(0)
+    }
+    app.run()
+}
+
 // `--show <files…>` opens the wheel live and stays up.
 if let i = args.firstIndex(of: "--show") {
     let paths = Array(args[(i + 1)...])

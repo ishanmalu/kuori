@@ -17,6 +17,7 @@ let package = Package(
                 .linkedFramework("PDFKit"),
                 .linkedFramework("Vision"),
                 .linkedFramework("Quartz"),
+                .linkedFramework("Carbon"),
             ]
         )
     ]
