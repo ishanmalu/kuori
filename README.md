@@ -5,7 +5,7 @@ A local file converter for macOS — a personal, faster, scriptable take on
 you drop a file in and the format comes away.
 
 Menu-bar HUD plus a `kuori` CLI that share one conversion engine. Nothing is
-uploaded anywhere. Built like [Perch](https://github.com/ishanmalu/perch):
+uploaded anywhere. Built like [Perch](https://github.com/ishanmalu/Perch):
 Swift + AppKit, SwiftPM, **no Xcode**, ad-hoc-signed. Checks run as
 `Kuori --selftest` (XCTest isn't in the Command Line Tools SDK).
 
@@ -58,7 +58,7 @@ background queue with a progress readout and auto-dismiss on success.
 swift run Kuori --selftest             # 50 graph + logic checks
 Scripts/build-app.sh 0.3.0             # -> dist/Kuori.app  (add --universal for arm64+x86_64)
 Scripts/make-dmg.sh 0.3.0             # -> dist/Kuori-0.3.0.dmg
-open dist/Kuori.app                    # menu-bar icon -> Drop Zone / Settings
+open dist/Kuori.app                    # menu-bar icon -> Open Wheel / Settings
 ```
 
 ## CLI
