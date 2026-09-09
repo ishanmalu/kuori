@@ -285,7 +285,7 @@ footer{border-top:1px solid var(--line); padding:44px 0 70px; color:var(--faint)
         <tbody>
         <tr><td>Images</td>
           <td><code>jpg png webp heic avif tiff bmp gif</code> in any direction, SVG → raster, raster → SVG by tracing</td>
-          <td class="mono">libvips · ImageIO<br>resvg · potrace</td></tr>
+          <td class="mono">ImageIO · cwebp<br>resvg · potrace</td></tr>
         <tr><td>Audio</td>
           <td><code>mp3 m4a aac wav flac ogg opus aiff</code></td>
           <td class="mono">ffmpeg</td></tr>
@@ -401,10 +401,10 @@ footer{border-top:1px solid var(--line); padding:44px 0 70px; color:var(--faint)
           <span class="chip">No upload</span><span class="chip">Works offline</span>
         </div>
       </div>
-      <div class="card c2 rv"><p class="big grad">9</p><p>engines bundled in the app</p></div>
+      <div class="card c2 rv"><p class="big grad">54</p><p>self-checks in the binary</p></div>
       <div class="card c2 rv"><p class="big grad">0</p><p>bytes leave your Mac</p></div>
-      <div class="card c2 rv"><p class="big grad">50</p><p>checks in the binary</p></div>
-      <div class="card c2 rv"><p class="big grad">MIT</p><p>and the source is right there</p></div>
+      <div class="card c2 rv"><p class="big grad">82</p><p>formats it speaks</p></div>
+      <div class="card c2 rv"><p class="big grad">Free</p><p>for anything noncommercial &mdash; source included</p></div>
     </div>
   </div>
 </section>
@@ -413,9 +413,9 @@ footer{border-top:1px solid var(--line); padding:44px 0 70px; color:var(--faint)
   <div class="wrap">
     <p class="eyebrow rv">Get it</p>
     <h2 class="rv">Download, or build from source.</h2>
-    <p class="sub rv">Signed ad-hoc, so the first launch needs a right-click → Open. MIT
-      licensed — Swift and AppKit, SwiftPM, no Xcode project, safety checks inside the
-      binary.</p>
+    <p class="sub rv">Signed ad-hoc, so the first launch needs a right-click → Open. Free
+      for any noncommercial use, source and all — Swift and AppKit, SwiftPM, no Xcode
+      project, safety checks inside the binary.</p>
     <div class="actions rv" style="justify-content:flex-start; margin:0 0 30px">
       <a class="btn" href="https://github.com/ishanmalu/kuori/releases/latest">Download 0.3.1
         <span>macOS 14+ · Intel &amp; Apple Silicon</span></a>
@@ -424,17 +424,18 @@ footer{border-top:1px solid var(--line); padding:44px 0 70px; color:var(--faint)
       <div class="codehead"><i></i><i></i><i></i></div>
 <pre>git clone https://github.com/ishanmalu/kuori
 cd kuori
-swift run Kuori <span class="s">--selftest</span>        <span class="c"># 50 graph + logic checks</span>
-Scripts/bundle-engines.sh         <span class="c"># vendor ffmpeg, vips, pandoc, …</span>
-Scripts/build-app.sh 0.3.0        <span class="c"># → dist/Kuori.app</span></pre>
+swift run Kuori <span class="s">--selftest</span>        <span class="c"># 54 graph + logic checks</span>
+Scripts/bundle-engines.sh         <span class="c"># vendor cwebp, qpdf, resvg, …</span>
+Scripts/build-app.sh 0.4.0        <span class="c"># → dist/Kuori.app</span></pre>
     </div>
     <div class="note rv" style="margin-top:24px">
       <span style="color:var(--neon)">◆</span>
-      <div>Universal, macOS 14 or later. The download is <b>101 MB</b> because nine engines
-        and ~86 dylibs ship inside it. Those are arm64 — Homebrew stopped publishing Intel
-        bottles for some of them — so on an Intel Mac every native route still works
-        (images, PDF, OCR, background removal, zip) and the rest light up with
-        <code class="mono">brew install ffmpeg vips pandoc …</code>.</div>
+      <div>Universal, macOS 14 or later. The download is small because most of Kuori is
+        native — ImageIO, PDFKit and Vision do the images, PDFs, OCR and background
+        removal, and only five permissively-licensed helpers ride along. Video, audio and
+        documents need the GPL tools, which aren't redistributed here: run
+        <code class="mono">brew install ffmpeg pandoc potrace</code> and Kuori finds them.
+        Same on Intel, where Homebrew no longer bottles every engine.</div>
     </div>
   </div>
 </section>

@@ -5,7 +5,7 @@ import Foundation
 /// so it also works from `swift run` on a dev machine.
 enum EngineLocator {
     static let binaryName: [EngineID: String] = [
-        .ffmpeg: "ffmpeg", .vips: "vips", .resvg: "resvg", .potrace: "potrace",
+        .ffmpeg: "ffmpeg", .vips: "vips", .cwebp: "cwebp", .resvg: "resvg", .potrace: "potrace",
         .pandoc: "pandoc", .qpdf: "qpdf", .sevenzip: "7zz", .unar: "unar",
         .bsdtar: "bsdtar", .exiftool: "exiftool", .libreoffice: "soffice",
     ]

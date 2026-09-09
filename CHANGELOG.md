@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.4.0
+
+- **Licence: PolyForm Noncommercial 1.0.0.** Kuori is free to use, read, modify
+  and pass around for anything that isn't commercial. Commercial use is a
+  conversation, not a download.
+- **The bundle is GPL-free.** ffmpeg, pandoc and potrace are gone from the DMG
+  (GPL-3 / GPL-2), and so is libvips — its bottle hard-links libfftw3 (GPL-2)
+  and libimagequant (GPL-3), and removing either dylib stops vips loading at
+  all. Kuori still finds every one of them on `PATH`; only redistribution
+  changed. `Resources/engine` went 350 MB → 20 MB.
+- **cwebp (BSD-3) replaces vips for WebP**, the one raster format macOS decodes
+  but won't encode. Any input ImageIO can read is staged through a temp PNG
+  first, so HEIC → WebP and friends still work, with quality, resize, EXIF
+  preservation and `--strip` all behaving as before.
+- `Scripts/collect-licenses.sh` walks the formulae behind the bundle and writes
+  `LICENSES/NOTICE.md` — component, SPDX identifier, upstream — plus the licence
+  texts themselves.
+- Fix: `brew install` hints in engine-missing errors now name the formula rather
+  than the binary (`webp`, not `cwebp`).
+
 ## 0.3.1
 
 - Universal binary — the app now carries both arm64 and x86_64 slices.

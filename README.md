@@ -7,7 +7,7 @@ converts it on your Mac — nothing is uploaded, ever.
 *Kuori* is Finnish for **peel**: you drop a file in and the format comes away.
 
 [**Download 0.3.1**](https://github.com/ishanmalu/kuori/releases/latest) ·
-[Site](https://ishanmalu.github.io/kuori/) · macOS 14+ · Universal · MIT
+[Site](https://ishanmalu.github.io/kuori/) · macOS 14+ · Universal · Free for noncommercial use
 
 A menu-bar wheel and a `kuori` CLI over one conversion engine, with nine
 converters bundled inside the app so it runs on a machine with nothing
@@ -21,7 +21,7 @@ can produce):
 
 | Class | Routes | Engine |
 |---|---|---|
-| Images | jpg png webp heic avif tiff bmp gif ↔ each other; svg → raster; raster → svg (trace) | libvips / ImageIO / resvg / potrace |
+| Images | jpg png webp heic avif tiff bmp gif ↔ each other; svg → raster; raster → svg (trace) | ImageIO / cwebp / resvg / potrace |
 | Audio | mp3 m4a aac wav flac ogg opus aiff ↔ each other | ffmpeg |
 | Video | mp4 mov mkv webm avi m4v ↔ each other; → gif; → audio | ffmpeg |
 | Documents | md html rtf txt epub docx odt ↔ each other; office → pdf; pdf → txt/docx | pandoc / LibreOffice / PDFKit |
@@ -103,25 +103,32 @@ can't run, so on Intel it falls straight through to `/usr/local/bin`. To light
 up video, audio, WebP, SVG and documents there:
 
 ```sh
-brew install ffmpeg vips resvg potrace unar qpdf sevenzip pandoc
+brew install ffmpeg webp resvg potrace unar qpdf sevenzip pandoc
 ```
 
 ## Bundled engines
 
 The app finds Homebrew copies on a dev machine. For a self-contained `.app`
-(~350 MB, DMG ~100 MB):
+(engine dir ~20 MB):
 
 ```sh
-brew install ffmpeg vips qpdf sevenzip unar resvg potrace pandoc
+brew install webp qpdf sevenzip unar resvg
 Scripts/bundle-engines.sh             # copies the binaries, then collect-dylibs.py
-                                     #   vendors ~86 dylibs into Resources/engine/libs/
-                                     #   and rewrites install names to @loader_path
-Scripts/build-app.sh 0.3.0
+                                      #   vendors the dylibs into Resources/engine/libs/
+                                      #   and rewrites install names to @loader_path
+Scripts/build-app.sh 0.4.0
 ```
 
-`Scripts/collect-dylibs.py` is a small deterministic stand-in for `dylibbundler`
-(walks `otool -L`, copies, `install_name_tool`s, strips package-manager rpaths).
-HEIC/AVIF go through macOS ImageIO — the vips bottle ships without libheif.
+The bundled set is deliberately GPL-free, so the DMG carries no source-offer
+obligation: cwebp (BSD-3), qpdf (Apache-2.0), resvg (MPL-2.0), 7zz and unar
+(LGPL, shipped as replaceable dylibs). ffmpeg, pandoc and potrace are GPL and
+libvips's bottle hard-links libfftw3 and libimagequant, so none of them are
+bundled — install them with Homebrew and Kuori picks them up off `PATH`.
+
+WebP is the one raster format macOS decodes but won't encode, so cwebp stands
+in; everything else runs on ImageIO, PDFKit and Vision. `Scripts/collect-dylibs.py`
+is a small deterministic stand-in for `dylibbundler` (walks `otool -L`, copies,
+`install_name_tool`s, strips package-manager rpaths).
 
 **LibreOffice** is bring-your-own: install it under `/Applications` (or drop a
 copy in `~/Library/Application Support/Kuori/engine/`) and Office↔PDF fidelity
@@ -131,4 +138,8 @@ Engine licenses live in `LICENSES/`.
 
 ## License
 
-MIT — see `LICENSE`. Bundled engines keep their own licenses.
+[PolyForm Noncommercial 1.0.0](LICENSE) — free to use, copy, modify and share
+for anything that isn't commercial. Read the source, build it yourself, send a
+patch. If you want it inside a business, ask me.
+
+Bundled engines keep their own licenses; see `LICENSES/NOTICE.md`.

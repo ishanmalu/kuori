@@ -36,35 +36,67 @@ enum NativeOps {
         }
     }
 
-    private static func writeCGImage(_ image: CGImage, to output: URL, id: String, quality: Int?) throws {
+    /// `keep` is the source's property dictionary. Passing it through is what
+    /// carries EXIF, GPS and the TIFF block into the new file; without it every
+    /// ImageIO conversion silently drops the capture date, camera and location.
+    private static func writeCGImage(_ image: CGImage, to output: URL, id: String,
+                                     quality: Int?, keep: [CFString: Any]? = nil) throws {
         guard let type = utType(for: id),
               let dest = CGImageDestinationCreateWithURL(output as CFURL, type.identifier as CFString, 1, nil) else {
-            throw ConvertError.badInput("The built-in encoder can't write \(id.uppercased()). Install vips.")
+            throw ConvertError.badInput("The built-in encoder can't write \(id.uppercased()).")
         }
-        var props: [CFString: Any] = [:]
+        var props = keep ?? [:]
+        // We always hand ImageIO upright pixels, and the stored dimensions would
+        // be stale after a resize or crop.
+        props[kCGImagePropertyOrientation] = 1
+        props.removeValue(forKey: kCGImagePropertyPixelWidth)
+        props.removeValue(forKey: kCGImagePropertyPixelHeight)
         if let q = quality, ["jpg", "heic", "webp", "avif"].contains(id) {
             props[kCGImageDestinationLossyCompressionQuality] = Double(q) / 100.0
         }
-        CGImageDestinationAddImage(dest, image, props as CFDictionary)   // no source metadata carried over
+        CGImageDestinationAddImage(dest, image, props as CFDictionary)
         guard CGImageDestinationFinalize(dest) else {
             throw ConvertError.badInput("Failed to write \(output.lastPathComponent)")
         }
     }
 
-    private static func loadCGImage(_ url: URL) throws -> CGImage {
+    /// The image with its EXIF rotation baked into the pixels, plus the source
+    /// properties. Everything downstream can then treat it as upright, which is
+    /// what makes a centre crop land where the viewer sees it.
+    private static func loadUpright(_ url: URL) throws -> (image: CGImage, props: [CFString: Any]) {
         guard let src = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let img = CGImageSourceCreateImageAtIndex(src, 0, nil) else {
+              let raw = CGImageSourceCreateImageAtIndex(src, 0, nil) else {
             throw ConvertError.badInput("Couldn't read image: \(url.lastPathComponent)")
         }
-        return img
+        let props = (CGImageSourceCopyPropertiesAtIndex(src, 0, nil) as? [CFString: Any]) ?? [:]
+        let o = (props[kCGImagePropertyOrientation] as? Int32) ?? 1
+        guard o > 1, o <= 8 else { return (raw, props) }
+        let ci = CIImage(cgImage: raw).oriented(forExifOrientation: o)
+        return (CIContext().createCGImage(ci, from: ci.extent) ?? raw, props)
+    }
+
+    private static func loadCGImage(_ url: URL) throws -> CGImage {
+        try loadUpright(url).image
     }
 
     private static func writeImage(from input: URL, to output: URL, target: Format, opts: ConvertOptions) throws {
-        var image = try loadCGImage(input)
+        var (image, props) = try loadUpright(input)
         if let w = opts.scaleWidth, w > 0, w < image.width {
             image = resized(image, toWidth: w) ?? image
         }
-        try writeCGImage(image, to: output, id: target.id, quality: opts.quality)
+        try writeCGImage(image, to: output, id: target.id, quality: opts.quality,
+                         keep: opts.stripMetadata ? nil : props)
+    }
+
+    /// Upright PNG of anything ImageIO can decode. cwebp only reads PNG/JPEG/TIFF,
+    /// so this is how a HEIC or a BMP reaches it.
+    static func stagePNG(_ input: URL, to output: URL, opts: ConvertOptions) throws {
+        var (image, props) = try loadUpright(input)
+        if let w = opts.scaleWidth, w > 0, w < image.width {
+            image = resized(image, toWidth: w) ?? image
+        }
+        try writeCGImage(image, to: output, id: "png", quality: nil,
+                         keep: opts.stripMetadata ? nil : props)
     }
 
     private static func resized(_ image: CGImage, toWidth w: Int) -> CGImage? {
@@ -87,7 +119,7 @@ enum NativeOps {
 
     static func editImage(_ input: URL, to output: URL, tool: Tool, params: ToolRunner.Params) throws {
         let id = Formats.byURL(output)?.id ?? output.pathExtension.lowercased()
-        var image = try loadCGImage(input)
+        var (image, props) = try loadUpright(input)
 
         switch tool {
         case .resize:
@@ -118,7 +150,8 @@ enum NativeOps {
         }
 
         let q = tool == .compress ? (params.quality ?? 60) : (tool == .stripMetadata ? nil : params.quality)
-        try writeCGImage(image, to: output, id: id, quality: q)
+        try writeCGImage(image, to: output, id: id, quality: q,
+                         keep: tool == .stripMetadata ? nil : props)
     }
 
     private static func aspectPair(_ s: String) -> (Int, Int) {

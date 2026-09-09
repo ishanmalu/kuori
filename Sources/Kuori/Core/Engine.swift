@@ -2,7 +2,7 @@ import Foundation
 
 /// `native` = done in-process with ImageIO / PDFKit / Vision, no binary needed.
 enum EngineID: String {
-    case ffmpeg, vips, resvg, potrace, pandoc, libreoffice, qpdf
+    case ffmpeg, vips, cwebp, resvg, potrace, pandoc, libreoffice, qpdf
     case sevenzip = "7zz"
     case unar, bsdtar, exiftool
     case native
@@ -34,6 +34,7 @@ struct Invocation {
     var producesDirectory = false    // the output path is a directory to create
     var nativeKind: NativeKind? = nil
     var rasterizeInputToPGM = false  // write a temp PGM first; "{PGM}" in args is the temp path
+    var stageInputAsPNG = false      // decode to a temp PNG first; "{PNG}" in args is the temp path
 }
 
 protocol Converter {
@@ -67,10 +68,19 @@ enum ConvertError: LocalizedError {
         case .unsupported(let f, let t): return "No route from \(f.uppercased()) to \(t.uppercased())."
         case .engineMissing(let e):
             return "The \(e.rawValue) engine isn't installed. Run Scripts/bundle-engines.sh, "
-                 + "or `brew install \(e == .sevenzip ? "sevenzip" : e.rawValue)`."
+                 + "or `brew install \(Self.formula(for: e))`."
         case .rarCreateUnsupported:
             return "Creating RAR archives isn't supported — there's no licensable RAR encoder. Use ZIP or 7z."
         case .processFailed(let c, let m): return "Engine exited \(c): \(m)"
+        }
+    }
+
+    /// Homebrew's name for an engine, where it differs from the binary's.
+    static func formula(for e: EngineID) -> String {
+        switch e {
+        case .sevenzip: return "sevenzip"
+        case .cwebp: return "webp"
+        default: return e.rawValue
         }
     }
 }
@@ -149,15 +159,21 @@ enum Engine {
         }
 
         var args = plan.args
-        var pgm: URL?
+        var staged: URL?
         if plan.rasterizeInputToPGM {
             let tmp = FileManager.default.temporaryDirectory
                 .appendingPathComponent("kuori-\(UUID().uuidString).pgm")
             try NativeOps.writeGrayPGM(input, to: tmp)
-            pgm = tmp
+            staged = tmp
             args = args.map { $0 == "{PGM}" ? tmp.path : $0 }
+        } else if plan.stageInputAsPNG {
+            let tmp = FileManager.default.temporaryDirectory
+                .appendingPathComponent("kuori-\(UUID().uuidString).png")
+            try NativeOps.stagePNG(input, to: tmp, opts: opts)
+            staged = tmp
+            args = args.map { $0 == "{PNG}" ? tmp.path : $0 }
         }
-        defer { pgm.map { try? FileManager.default.removeItem(at: $0) } }
+        defer { staged.map { try? FileManager.default.removeItem(at: $0) } }
 
         let r = ProcessRun.run(bin, args, env: bundledEngineEnv(bin), timeout: 600)
         if r.code != 0 {

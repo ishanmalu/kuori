@@ -35,11 +35,23 @@ struct ImageConverter: Converter {
                               rasterizeInputToPGM: true)
         }
 
+        // WebP is the one raster format ImageIO decodes but won't encode, so it
+        // needs a binary. cwebp is the small BSD one we bundle; vips also works
+        // if the user has it. Either way the input is decoded to a temp PNG
+        // first — cwebp reads PNG/JPEG/TIFF only, and going through ImageIO is
+        // what lets a HEIC or a BMP get here at all.
+        if to.id == "webp", EngineLocator.path(for: .cwebp) != nil {
+            var a = ["-q", String(opts.quality ?? 82)]
+            if !opts.stripMetadata { a += ["-metadata", "all"] }
+            return Invocation(engine: .cwebp, args: a + ["{PNG}", "-o", output.path],
+                              stageInputAsPNG: true)
+        }
+
         // ImageIO for HEIC/AVIF (bundled vips can't) and as the fallback when
         // vips isn't installed at all.
         if Self.heifish.contains(from.id) || Self.heifish.contains(to.id) || EngineLocator.path(for: .vips) == nil {
             guard Self.imageIOWritable.contains(to.id) else {
-                throw ConvertError.engineMissing(.vips)
+                throw ConvertError.engineMissing(to.id == "webp" ? .cwebp : .vips)
             }
             return Invocation(engine: .native, nativeKind: .imageIO(to))
         }
