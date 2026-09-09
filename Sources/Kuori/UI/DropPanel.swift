@@ -164,11 +164,22 @@ private final class WheelHUD: NSView {
 
     /// Shown by `DragMonitor` before we know what's being dragged.
     func armForDrag() {
+        resetIdle()
         dragSummoned = true
+    }
+
+    /// Back to the empty ring — after a conversion, or before a new drag.
+    private func resetIdle() {
         inputs = []
         formats = []
         thumb = nil
         items = []
+        presetParent = nil
+        hover = nil
+        focus = 0
+        running = false
+        progress = 0
+        dragSummoned = false
         needsDisplay = true
     }
 
@@ -301,10 +312,12 @@ private final class WheelHUD: NSView {
                     self?.progress = 1
                     self?.needsDisplay = true
                     if let reveal { NSWorkspace.shared.activateFileViewerSelecting([reveal]) }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                        self?.owner?.orderOut(nil)
-                        self?.running = false
-                        self?.progress = 0
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.85) {
+                        guard let self else { return }
+                        // Came from a drag → get out of the way. Opened deliberately
+                        // (hotkey, or clicked into) → stay, cleared, ready for the next file.
+                        if self.window?.isKeyWindow != true { self.owner?.orderOut(nil) }
+                        self.resetIdle()
                     }
                 }
             } catch {
