@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.6.0 — Daisy
+
+Kuori is now **Daisy**. The name was a Finnish pun on *peel*, inherited from
+being a Tangerine alternative; the wheel long ago stopped being citrus and
+became a ring of petals around a centre, so the name now describes the thing
+itself.
+
+- **White petals, yellow centre.** The petals are near-opaque on purpose — a
+  translucent white over a dark desktop turns grey, and grey petals aren't a
+  daisy — so the glass shows in the gaps between them and around the rim. The
+  centre is a vertical gradient rather than a flat fill, and the progress pill
+  inverts to accent-on-dark because it sits on top of it.
+- Icon and menu-bar glyph redrawn from the wheel's own geometry, so the mark and
+  the UI can't drift apart.
+- Everything renamed: `daisy` on the command line, `com.ishanmalu.daisy`,
+  `~/Library/Application Support/Daisy`, the hotkey's four-char code. **An
+  existing install keeps its config under the old Kuori folder** — this is a
+  fresh directory, not a migration. Copy `presets.json`, `recipes.json` and
+  `watch.json` across if you had any.
+- `--demo` takes `tools` / `recipes` too, which is how the site screenshots are
+  taken.
+
 ## 0.5.0
 
 - **Click to choose.** The empty ring is a button now: click it (or press ↵, or
