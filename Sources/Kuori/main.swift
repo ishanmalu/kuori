@@ -7,7 +7,7 @@ if rawArgs.first == "--selftest" {
 }
 
 // CLI mode: anything that starts with a known verb runs headless and exits.
-if let first = rawArgs.first,
+if let first = rawArgs.first, first != "--show",
    ["convert", "tool", "merge", "split", "recipe", "watch", "presets", "recipes",
     "formats", "info", "help", "-h", "--help"].contains(first) {
     exit(CLI.run(rawArgs))
@@ -36,6 +36,21 @@ if let i = rawArgs.firstIndex(of: "--shot-ui") {
         print("wrote \(out)")
         exit(0)
     }
+    app.run()
+}
+
+// `--show <files…>` opens the wheel live with those files and keeps running,
+// for eyeballing / screenshotting the real thing.
+if let i = rawArgs.firstIndex(of: "--show") {
+    let app = NSApplication.shared
+    let delegate = AppDelegate()
+    app.delegate = delegate
+    app.setActivationPolicy(.accessory)
+    let paths = Array(rawArgs[(i + 1)...])
+    let urls = paths.isEmpty
+        ? [URL(fileURLWithPath: "/tmp/a.png"), URL(fileURLWithPath: "/tmp/b.jpg")]
+        : paths.map { URL(fileURLWithPath: $0) }
+    DispatchQueue.main.async { DropPanel.shared.load(urls: urls) }
     app.run()
 }
 

@@ -11,7 +11,7 @@ final class DropPanel: NSPanel {
     private let hud = WheelHUD()
 
     private init() {
-        super.init(contentRect: NSRect(x: 0, y: 0, width: 360, height: 404),
+        super.init(contentRect: NSRect(x: 0, y: 0, width: 300, height: 300),
                    styleMask: [.borderless, .nonactivatingPanel],
                    backing: .buffered, defer: true)
         isFloatingPanel = true
@@ -76,14 +76,14 @@ private final class WheelHUD: NSView {
     private var progress: Double = 0
     private var statusText = ""
 
-    // geometry
-    private var center: CGPoint { CGPoint(x: bounds.midX, y: bounds.midY + 6) }
-    private let discR: CGFloat = 150
-    private let innerR: CGFloat = 70
-    private let outerR: CGFloat = 142
+    // geometry — the HUD is just this circle, no card behind it
+    private var center: CGPoint { CGPoint(x: bounds.midX, y: bounds.midY) }
+    private let discR: CGFloat = 143
+    private let hubR: CGFloat = 44
+    private let innerR: CGFloat = 50
+    private let outerR: CGFloat = 134
     private var midR: CGFloat { (innerR + outerR) / 2 }
-    private var petalThickness: CGFloat { outerR - innerR }
-    private let petalGap: CGFloat = 0.09   // radians between petals
+    private let petalGap: CGFloat = 0.10   // radians between petals
 
     override init(frame f: NSRect) {
         super.init(frame: f)
@@ -313,39 +313,34 @@ private final class WheelHUD: NSView {
 
     // MARK: paint
 
+    private func discRect() -> NSRect {
+        NSRect(x: center.x - discR, y: center.y - discR, width: discR * 2, height: discR * 2)
+    }
+
     override func draw(_ dirty: NSRect) {
-        // card
-        Theme.paper.setFill()
-        let card = NSBezierPath(roundedRect: bounds.insetBy(dx: 1, dy: 1), xRadius: 18, yRadius: 18)
-        card.fill()
-        card.lineWidth = 1; Theme.hairline.setStroke(); card.stroke()
-
-        // top mode label
-        drawCentered(modeLabel(), y: bounds.maxY - 26, size: 10, weight: .semibold, color: Theme.inkFaint, tracking: 1.4)
-
         guard !inputs.isEmpty else {
-            let ring = NSBezierPath(ovalIn: CGRect(x: center.x - discR, y: center.y - discR, width: discR * 2, height: discR * 2))
+            let ring = NSBezierPath(ovalIn: discRect())
+            Theme.paper.withAlphaComponent(0.9).setFill(); ring.fill()
             ring.lineWidth = 1.5
             ring.setLineDash([6, 5], count: 2, phase: 0)
             Theme.hairline.setStroke(); ring.stroke()
-            drawCentered("Drop files", y: center.y + 4, size: 14, weight: .semibold, color: Theme.ink)
-            drawCentered("or ⌘V paste", y: center.y - 16, size: 11, weight: .regular, color: Theme.inkFaint)
+            drawCentered("Drop", at: CGPoint(x: center.x, y: center.y + 9), size: 14, weight: .semibold, color: Theme.ink)
+            drawCentered("files", at: CGPoint(x: center.x, y: center.y - 9), size: 14, weight: .semibold, color: Theme.ink)
             return
         }
 
-        // faint disc behind the petals
-        let disc = NSBezierPath(ovalIn: CGRect(x: center.x - discR, y: center.y - discR, width: discR * 2, height: discR * 2))
-        Theme.ink.withAlphaComponent(0.035).setFill(); disc.fill()
+        // the circle — the only "surface" there is
+        let disc = NSBezierPath(ovalIn: discRect())
+        Theme.paper.withAlphaComponent(0.98).setFill(); disc.fill()
+        Theme.hairline.withAlphaComponent(0.7).setStroke(); disc.lineWidth = 1; disc.stroke()
 
         if items.isEmpty {
-            drawCentered("nothing converts", y: center.y + 6, size: 12, weight: .medium, color: Theme.ink)
-            drawCentered("this selection", y: center.y - 12, size: 12, weight: .medium, color: Theme.ink)
+            drawCentered("no route for", at: CGPoint(x: center.x, y: center.y + 8), size: 12, weight: .medium, color: Theme.ink)
+            drawCentered("this selection", at: CGPoint(x: center.x, y: center.y - 10), size: 12, weight: .medium, color: Theme.ink)
         } else {
             for i in items.indices { drawPetal(i) }
         }
-
         drawHub()
-        drawCaption()
     }
 
     private func drawPetal(_ i: Int) {
@@ -380,45 +375,50 @@ private final class WheelHUD: NSView {
                      color: fg, tracking: 0.2, maxWidth: 88)
     }
 
+    /// The hub carries the source file (a thumbnail when it's an image, else its
+    /// type / count) with the current target on a small pill — like Tangerine.
     private func drawHub() {
-        let w: CGFloat = 96, h: CGFloat = 46
-        let r = NSRect(x: center.x - w / 2, y: center.y - h / 2, width: w, height: h)
-        let hub = NSBezierPath(roundedRect: r, xRadius: 12, yRadius: 12)
+        let hubRect = NSRect(x: center.x - hubR, y: center.y - hubR, width: hubR * 2, height: hubR * 2)
+        let hub = NSBezierPath(ovalIn: hubRect)
         Theme.paper.setFill(); hub.fill()
+
+        if inputs.count == 1, let img = NSImage(contentsOf: inputs[0]), img.size.width > 0 {
+            NSGraphicsContext.saveGraphicsState()
+            hub.addClip()
+            let side = max(hubRect.width, hubRect.height)
+            let scale = side / min(img.size.width, img.size.height)
+            let dw = img.size.width * scale, dh = img.size.height * scale
+            img.draw(in: NSRect(x: center.x - dw / 2, y: center.y - dh / 2, width: dw, height: dh),
+                     from: .zero, operation: .sourceOver, fraction: 1)
+            NSGraphicsContext.restoreGraphicsState()
+        } else {
+            drawCentered(sourceLabel(), at: CGPoint(x: center.x, y: center.y + 4), size: 12, weight: .semibold, color: Theme.ink)
+        }
         Theme.hairline.setStroke(); hub.lineWidth = 1; hub.stroke()
 
-        let label: String
-        if running { label = "\(Int(progress * 100))%" }
-        else if presetParent != nil { label = presetParent!.label.uppercased() }
-        else if !inputs.isEmpty { label = focusTitle() ?? hubFallback() }
-        else { label = "" }
-        drawCentered(label, at: CGPoint(x: center.x, y: center.y - 5), size: 12, weight: .semibold, color: Theme.ink)
+        // target pill
+        let pill = running ? "\(Int(progress * 100))%"
+            : presetParent != nil ? presetParent!.label.uppercased()
+            : (focusTitle() ?? "")
+        guard !pill.isEmpty else { return }
+        let font = NSFont.systemFont(ofSize: 11, weight: .semibold)
+        let tw = (pill as NSString).size(withAttributes: [.font: font]).width
+        let pw = tw + 18, ph: CGFloat = 20
+        let pr = NSRect(x: center.x - pw / 2, y: center.y - hubR + 6, width: pw, height: ph)
+        let pillPath = NSBezierPath(roundedRect: pr, xRadius: ph / 2, yRadius: ph / 2)
+        Theme.ink.setFill(); pillPath.fill()
+        drawCentered(pill, at: CGPoint(x: pr.midX, y: pr.midY), size: 11, weight: .semibold, color: Theme.paper)
     }
 
-    private func drawCaption() {
-        let text: String
-        if !statusText.isEmpty { text = statusText }
-        else if items.isEmpty { text = "" }
-        else {
-            switch mode {
-            case .convert: text = "Convert to \(focusTitle() ?? "")"
-            case .tools:   text = presetParent != nil ? "\(presetParent!.label) · \(focusTitle() ?? "")" : (focusTitle() ?? "")
-            case .recipes: text = "Recipe · \(focusTitle() ?? "")"
-            }
-        }
-        drawCentered(text, y: 30, size: 11, weight: .regular, color: Theme.inkFaint)
-        drawCentered("↔ move   ↵ run   ⌥ tools   ⇥ mode   esc", y: 14, size: 9, weight: .regular, color: Theme.inkFaint.withAlphaComponent(0.7))
+    private func sourceLabel() -> String {
+        if inputs.count > 1 { return "\(inputs.count) FILES" }
+        return formats.first?.label ?? inputs.first.map { $0.pathExtension.uppercased() } ?? ""
     }
 
-    private func modeLabel() -> String {
-        switch mode {
-        case .convert: return inputs.count <= 1 ? (inputs.first?.lastPathComponent ?? "CONVERT") : "\(inputs.count) FILES"
-        case .tools:   return "TOOLS"
-        case .recipes: return "RECIPES"
-        }
+    private var activeIndex: Int { hover ?? focus }
+    private func focusTitle() -> String? {
+        items.indices.contains(activeIndex) ? items[activeIndex].title.replacingOccurrences(of: "\n", with: " ") : nil
     }
-    private func focusTitle() -> String? { items.indices.contains(focus) ? items[focus].title : nil }
-    private func hubFallback() -> String { formats.first?.label ?? "" }
 
     private func drawCentered(_ s: String, y: CGFloat, size: CGFloat, weight: NSFont.Weight,
                               color: NSColor, tracking: CGFloat = 0) {
