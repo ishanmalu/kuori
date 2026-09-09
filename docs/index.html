@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kuori — the file converter that comes to you</title>
+<title>Kuori — File Converter for Mac</title>
 <meta name="description" content="A local file converter for macOS. Hold Shift, drag a file, drop it on a petal. Images, audio, video, documents, archives — all on-device, nothing uploaded.">
 <link rel="icon" href="img/icon.png">
-<meta property="og:title" content="Kuori — the file converter that comes to you">
+<meta property="og:title" content="Kuori — File Converter for Mac">
 <meta property="og:description" content="Hold Shift, drag a file, drop it on a petal. Everything runs on your Mac.">
 <meta property="og:image" content="img/wheel-convert.png">
 <meta name="theme-color" content="#08090a">
@@ -89,6 +89,17 @@ kbd{font:600 12.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--i
   background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.02));
   border:1px solid var(--line); border-bottom-color:rgba(0,0,0,.5); border-bottom-width:2px;
   border-radius:8px; padding:7px 10px}
+
+.actions{display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-top:34px}
+.btn{display:inline-flex; flex-direction:column; align-items:center; gap:2px;
+  background:var(--neon); color:#062010; border:1px solid var(--neon);
+  padding:11px 26px; border-radius:12px; font-size:15px; font-weight:640;
+  transition:.2s; box-shadow:0 0 34px -8px var(--neon)}
+.btn:hover{transform:translateY(-2px); box-shadow:0 0 46px -6px var(--neon)}
+.btn span{font-size:11px; font-weight:500; opacity:.62; letter-spacing:.02em}
+.btn.ghost{background:transparent; color:var(--ink); border-color:var(--line);
+  box-shadow:none; justify-content:center; padding:11px 22px}
+.btn.ghost:hover{border-color:var(--neon-line); color:var(--neon)}
 
 /* ── live wheel ────────────────────────────────────────────── */
 .stage{margin:56px auto 0; width:min(520px,86vw); aspect-ratio:1; position:relative}
@@ -214,6 +225,11 @@ footer{border-top:1px solid var(--line); padding:44px 0 70px; color:var(--faint)
   <p class="lede">Hold Shift, drag a file, drop it on a petal. Kuori puts a wheel of every
     format that file can become right where you are — and converts it on your Mac,
     without uploading a thing.</p>
+  <div class="actions">
+    <a class="btn" href="https://github.com/ishanmalu/kuori/releases/latest">Download for Mac
+      <span>0.3.0 · 101 MB</span></a>
+    <a class="btn ghost" href="https://github.com/ishanmalu/kuori">View source</a>
+  </div>
   <div class="keys">
     <kbd>⇧</kbd> drag a file &nbsp;·&nbsp; <kbd>⌥</kbd><kbd>⇧</kbd><kbd>V</kbd> anywhere
   </div>
@@ -395,11 +411,15 @@ footer{border-top:1px solid var(--line); padding:44px 0 70px; color:var(--faint)
 
 <section id="install">
   <div class="wrap">
-    <p class="eyebrow rv">Install</p>
-    <h2 class="rv">Build it yourself.</h2>
-    <p class="sub rv">A personal project, MIT licensed, built the way the rest of my Mac tools
-      are: Swift and AppKit, SwiftPM, no Xcode project, and the safety checks shipped inside
-      the binary.</p>
+    <p class="eyebrow rv">Get it</p>
+    <h2 class="rv">Download, or build from source.</h2>
+    <p class="sub rv">Signed ad-hoc, so the first launch needs a right-click → Open. MIT
+      licensed — Swift and AppKit, SwiftPM, no Xcode project, safety checks inside the
+      binary.</p>
+    <div class="actions rv" style="justify-content:flex-start; margin:0 0 30px">
+      <a class="btn" href="https://github.com/ishanmalu/kuori/releases/latest">Download 0.3.0
+        <span>macOS 14+ · Apple Silicon</span></a>
+    </div>
     <div class="rv">
       <div class="codehead"><i></i><i></i><i></i></div>
 <pre>git clone https://github.com/ishanmalu/kuori
@@ -422,6 +442,7 @@ Scripts/build-app.sh 0.3.0        <span class="c"># → dist/Kuori.app</span></p
 <footer>
   <div class="wrap foot">
     <span>Kuori — Finnish for <em>peel</em>. You drop a file in and the format comes away.</span>
+    <span><a href="https://github.com/ishanmalu/kuori/releases/latest">Download</a></span>
     <span class="sp"><a href="https://github.com/ishanmalu/kuori">Source</a></span>
     <span><a href="https://github.com/ishanmalu/Perch">Perch</a></span>
     <span><a href="https://ishanmalu.github.io">ishanmalu.github.io</a></span>

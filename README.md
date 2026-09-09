@@ -1,13 +1,18 @@
-# Kuori
+# Kuori — File Converter for Mac
 
-A local file converter for macOS — a personal, faster, scriptable take on
-[Tangerine](https://tangerineformac.com/). *Kuori* is Finnish for **peel / rind**:
-you drop a file in and the format comes away.
+**The converter that comes to you.** Hold Shift, drag a file, drop it on a petal.
+Kuori puts a wheel of every format that file can become right where you are, and
+converts it on your Mac — nothing is uploaded, ever.
 
-Menu-bar HUD plus a `kuori` CLI that share one conversion engine. Nothing is
-uploaded anywhere. Built like [Perch](https://github.com/ishanmalu/Perch):
-Swift + AppKit, SwiftPM, **no Xcode**, ad-hoc-signed. Checks run as
-`Kuori --selftest` (XCTest isn't in the Command Line Tools SDK).
+*Kuori* is Finnish for **peel**: you drop a file in and the format comes away.
+
+[**Download 0.3.0**](https://github.com/ishanmalu/kuori/releases/latest) ·
+[Site](https://ishanmalu.github.io/kuori/) · macOS 14+ · Apple Silicon · MIT
+
+A menu-bar wheel and a `kuori` CLI over one conversion engine, with nine
+converters bundled inside the app so it runs on a machine with nothing
+installed. Swift + AppKit, SwiftPM, no Xcode; checks ship in the binary as
+`Kuori --selftest`.
 
 ## What it does
 
@@ -56,11 +61,10 @@ progress readout and auto-dismiss on success.
 
 ## Site
 
-`docs/` is a one-page product site (dark, neon, screenshots straight out of
-`--shot-ui`). Open `docs/index.html`, or turn on GitHub Pages → *Deploy from
-branch* → `main` / `/docs`.
+[ishanmalu.github.io/kuori](https://ishanmalu.github.io/kuori/) — served from
+`docs/`. The hero wheel is live SVG built from the same geometry the app draws.
 
-## Build & run
+## Build from source
 
 ```sh
 swift run Kuori --selftest             # 50 graph + logic checks
