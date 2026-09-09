@@ -341,7 +341,7 @@ private final class WheelHUD: NSView {
             disc.fill()
             disc.lineWidth = 1.5
             disc.setLineDash([6, 5], count: 2, phase: 0)
-            Theme.hairline.setStroke()
+            Theme.neon.withAlphaComponent(0.4).setStroke()
             disc.stroke()
             text("Drop", at: CGPoint(x: center.x, y: center.y + 9), 14, .semibold, Theme.ink)
             text("files", at: CGPoint(x: center.x, y: center.y - 9), 14, .semibold, Theme.ink)
@@ -350,7 +350,7 @@ private final class WheelHUD: NSView {
 
         Theme.paper.withAlphaComponent(0.98).setFill()
         disc.fill()
-        Theme.hairline.withAlphaComponent(0.7).setStroke()
+        Theme.hairline.setStroke()
         disc.lineWidth = 1
         disc.stroke()
 
@@ -363,19 +363,36 @@ private final class WheelHUD: NSView {
         drawHub()
     }
 
+    /// Dark text that stays readable on a bright neon fill, in either appearance.
+    private static let onNeon = NSColor(srgbRed: 0.04, green: 0.10, blue: 0.05, alpha: 1)
+
     private func drawPetal(_ i: Int) {
         let active = (hover ?? focus) == i
         let petal = petalPath(i)
+        let fg: NSColor
 
-        (active ? Theme.ink : Theme.ink.withAlphaComponent(0.06)).setFill()
-        petal.fill()
-        if running {
-            (active ? Theme.paper : Theme.ink).withAlphaComponent(0.3).setFill()
+        if active {
+            NSGraphicsContext.saveGraphicsState()
+            let glow = NSShadow()
+            glow.shadowColor = Theme.neon.withAlphaComponent(0.55)
+            glow.shadowBlurRadius = 16
+            glow.shadowOffset = .zero
+            glow.set()
+            Theme.neon.setFill()
             petal.fill()
+            NSGraphicsContext.restoreGraphicsState()
+            if running { Theme.neon.withAlphaComponent(0.35).setFill(); petal.fill() }
+            fg = Self.onNeon
+        } else {
+            Theme.cardFill.setFill()
+            petal.fill()
+            Theme.hairline.setStroke()
+            petal.lineWidth = 1
+            petal.stroke()
+            fg = Theme.ink
         }
 
         let item = items[i]
-        let fg = active ? Theme.paper : Theme.ink
         let p = polar(midR + 5, angle(i))
         var labelY = p.y
         if let name = item.symbol,
@@ -414,9 +431,17 @@ private final class WheelHUD: NSView {
         guard !pill.isEmpty else { return }
         let width = (pill as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 11, weight: .semibold)]).width + 18
         let r = NSRect(x: center.x - width / 2, y: center.y - hubR + 6, width: width, height: 20)
-        Theme.ink.setFill()
-        NSBezierPath(roundedRect: r, xRadius: 10, yRadius: 10).fill()
-        text(pill, at: CGPoint(x: r.midX, y: r.midY), 11, .semibold, Theme.paper)
+        let shape = NSBezierPath(roundedRect: r, xRadius: 10, yRadius: 10)
+        NSGraphicsContext.saveGraphicsState()
+        let glow = NSShadow()
+        glow.shadowColor = Theme.neon.withAlphaComponent(0.5)
+        glow.shadowBlurRadius = 10
+        glow.shadowOffset = .zero
+        glow.set()
+        Theme.neon.setFill()
+        shape.fill()
+        NSGraphicsContext.restoreGraphicsState()
+        text(pill, at: CGPoint(x: r.midX, y: r.midY), 11, .semibold, Self.onNeon)
     }
 
     private func sourceLabel() -> String {
