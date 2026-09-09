@@ -204,8 +204,8 @@ private final class WheelHUD: NSView {
             var first: URL?
             for (i, input) in files.enumerated() {
                 guard let out = Naming.output(for: input, target: target, into: nil, collision: .suffix) else { continue }
-                if first == nil { first = out }
-                try Engine.run(input: input, to: target, output: out, opts: ConvertOptions())
+                let written = try Engine.run(input: input, to: target, output: out, opts: ConvertOptions())
+                if first == nil { first = written }
                 report(i + 1)
             }
             return (first, "\(files.count) → \(target.label)")

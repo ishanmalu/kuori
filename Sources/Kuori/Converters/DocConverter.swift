@@ -71,7 +71,7 @@ struct DocConverter: Converter {
 
     private func pandoc(_ input: URL, to output: URL) throws {
         guard let bin = EngineLocator.path(for: .pandoc) else { throw ConvertError.engineMissing(.pandoc) }
-        let r = ProcessRun.run(bin, [input.path, "-o", output.path])
+        let r = ProcessRun.run(bin, [input.path, "-o", output.path], timeout: 120)
         if r.code != 0 {
             throw ConvertError.processFailed(code: r.code, message: String((r.stderr.isEmpty ? r.stdout : r.stderr).suffix(500)))
         }
@@ -87,7 +87,8 @@ struct DocConverter: Converter {
         let convertTo = filter.map { "\(toExt):\($0)" } ?? toExt
         let profile = "-env:UserInstallation=file://" + outDir.appendingPathComponent("profile").path
         let r = ProcessRun.run(bin, ["--headless", "--norestore", profile,
-                                     "--convert-to", convertTo, "--outdir", outDir.path, input.path])
+                                     "--convert-to", convertTo, "--outdir", outDir.path, input.path],
+                               timeout: 300)
         if r.code != 0 {
             throw ConvertError.processFailed(code: r.code, message: String((r.stderr.isEmpty ? r.stdout : r.stderr).suffix(500)))
         }

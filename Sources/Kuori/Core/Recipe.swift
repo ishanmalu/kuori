@@ -89,10 +89,9 @@ enum RecipeRunner {
                         ?? tmp(target.ext))
                     : tmp(target.ext)
                 if !isLast { temps.append(out) }
-                try Engine.run(input: current, to: target, output: out,
-                               opts: ConvertOptions(quality: step.quality, scale: step.scale,
-                                                    stripMetadata: step.strip ?? false))
-                current = out
+                current = try Engine.run(input: current, to: target, output: out,
+                                         opts: ConvertOptions(quality: step.quality, scale: step.scale,
+                                                              stripMetadata: step.strip ?? false))
 
             case .tool:
                 guard let raw = step.tool, let t = Tool(rawValue: raw) else {

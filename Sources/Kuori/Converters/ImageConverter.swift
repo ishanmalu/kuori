@@ -44,22 +44,18 @@ struct ImageConverter: Converter {
             return Invocation(engine: .native, nativeKind: .imageIO(to))
         }
 
-        var op: [String]
-        if let w = opts.scaleWidth {
-            op = ["thumbnail", input.path, output.path, String(w)]
-        } else {
-            op = ["copy", input.path, output.path]
-        }
-
         // vips save options ride on the output filename: out.jpg[Q=80,strip]
         var saveOpts: [String] = []
         if let q = opts.quality, ["jpg", "webp", "heic", "avif", "tiff"].contains(to.id) {
             saveOpts.append("Q=\(q)")
         }
         if opts.stripMetadata { saveOpts.append("strip") }
-        if !saveOpts.isEmpty {
-            op[op.count - 1] += "[\(saveOpts.joined(separator: ","))]"
+        let outSpec = saveOpts.isEmpty ? output.path : "\(output.path)[\(saveOpts.joined(separator: ","))]"
+
+        if let w = opts.scaleWidth {
+            // --size down keeps it from upscaling small inputs, like the ImageIO path.
+            return Invocation(engine: .vips, args: ["thumbnail", input.path, outSpec, String(w), "--size", "down"])
         }
-        return Invocation(engine: .vips, args: op)
+        return Invocation(engine: .vips, args: ["copy", input.path, outSpec])
     }
 }

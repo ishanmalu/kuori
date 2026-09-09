@@ -89,8 +89,8 @@ enum CLI {
                 print("skip  \(input.lastPathComponent) (exists)"); continue
             }
             do {
-                try Engine.run(input: input, to: target, output: output, opts: opts)
-                print("ok    \(input.lastPathComponent)  ->  \(output.path)")
+                let written = try Engine.run(input: input, to: target, output: output, opts: opts)
+                print("ok    \(input.lastPathComponent)  ->  \(written.path)")
             } catch {
                 err("fail  \(input.lastPathComponent): \(error.localizedDescription)")
                 failures += 1

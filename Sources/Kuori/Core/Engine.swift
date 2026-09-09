@@ -13,8 +13,10 @@ struct ConvertOptions {
     var scale: String? = nil         // "WIDTHx" — target width, aspect kept
     var stripMetadata: Bool = false
 
+    /// Target width from a "WIDTHx" string. "x400" (height only) yields nil.
     var scaleWidth: Int? {
-        guard let s = scale?.split(separator: "x").first, let w = Int(s) else { return nil }
+        guard let s = scale?.split(separator: "x", omittingEmptySubsequences: false).first,
+              let w = Int(s), w > 0 else { return nil }
         return w
     }
 }
@@ -42,10 +44,14 @@ protocol Converter {
     /// It has to be a protocol requirement, not just an extension member, or
     /// calls through the existential would pick the default.
     func execute(input: URL, from: Format, to: Format, output: URL, opts: ConvertOptions) throws -> Bool
+    /// True when the output is a directory (PDF pages, an extracted archive) —
+    /// Engine drops the extension the caller put on the path.
+    func writesDirectory(from: Format, to: Format) -> Bool
 }
 
 extension Converter {
     func execute(input: URL, from: Format, to: Format, output: URL, opts: ConvertOptions) throws -> Bool { false }
+    func writesDirectory(from: Format, to: Format) -> Bool { false }
 }
 
 enum ConvertError: LocalizedError {
@@ -109,8 +115,10 @@ enum Engine {
         ]
     }
 
-    /// One file in, one file (or one folder) out. Blocking.
-    static func run(input: URL, to target: Format, output: URL, opts: ConvertOptions) throws {
+    /// One file in, one file (or one folder) out. Blocking. Returns the path
+    /// actually written, which differs from `output` when the result is a folder.
+    @discardableResult
+    static func run(input: URL, to target: Format, output: URL, opts: ConvertOptions) throws -> URL {
         guard let from = Formats.byURL(input) else {
             throw ConvertError.badInput("Unrecognized file type: \(input.lastPathComponent)")
         }
@@ -118,19 +126,23 @@ enum Engine {
             throw ConvertError.unsupported(from: from.id, to: target.id)
         }
 
-        let parent = output.deletingLastPathComponent()
-        try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
+        var dest = output
+        if conv.writesDirectory(from: from, to: target), !dest.pathExtension.isEmpty {
+            dest = dest.deletingPathExtension()
+        }
+        try FileManager.default.createDirectory(at: dest.deletingLastPathComponent(),
+                                                withIntermediateDirectories: true)
 
-        if try conv.execute(input: input, from: from, to: target, output: output, opts: opts) { return }
+        if try conv.execute(input: input, from: from, to: target, output: dest, opts: opts) { return dest }
 
-        let plan = try conv.plan(input: input, from: from, to: target, output: output, opts: opts)
+        let plan = try conv.plan(input: input, from: from, to: target, output: dest, opts: opts)
         if plan.producesDirectory {
-            try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(at: dest, withIntermediateDirectories: true)
         }
 
         if let kind = plan.nativeKind {
-            try NativeOps.perform(kind, input: input, output: output, opts: opts)
-            return
+            try NativeOps.perform(kind, input: input, output: dest, opts: opts)
+            return dest
         }
         guard let bin = EngineLocator.path(for: plan.engine) else {
             throw ConvertError.engineMissing(plan.engine)
@@ -152,5 +164,6 @@ enum Engine {
             let msg = r.stderr.isEmpty ? r.stdout : r.stderr
             throw ConvertError.processFailed(code: r.code, message: String(msg.suffix(600)))
         }
+        return dest
     }
 }

@@ -60,27 +60,11 @@ enum NativeOps {
     }
 
     private static func writeImage(from input: URL, to output: URL, target: Format, opts: ConvertOptions) throws {
-        guard let type = utType(for: target.id) else {
-            throw ConvertError.badInput("The built-in encoder can't write \(target.label). Install vips.")
-        }
-        guard let src = CGImageSourceCreateWithURL(input as CFURL, nil),
-              var image = CGImageSourceCreateImageAtIndex(src, 0, nil) else {
-            throw ConvertError.badInput("Couldn't read image: \(input.lastPathComponent)")
-        }
+        var image = try loadCGImage(input)
         if let w = opts.scaleWidth, w > 0, w < image.width {
             image = resized(image, toWidth: w) ?? image
         }
-        guard let dest = CGImageDestinationCreateWithURL(output as CFURL, type.identifier as CFString, 1, nil) else {
-            throw ConvertError.badInput("Couldn't create \(output.lastPathComponent)")
-        }
-        var props: [CFString: Any] = [:]
-        if let q = opts.quality, target.id == "jpg" || target.id == "heic" {
-            props[kCGImageDestinationLossyCompressionQuality] = Double(q) / 100.0
-        }
-        CGImageDestinationAddImage(dest, image, props as CFDictionary)
-        guard CGImageDestinationFinalize(dest) else {
-            throw ConvertError.badInput("Failed to write \(output.lastPathComponent)")
-        }
+        try writeCGImage(image, to: output, id: target.id, quality: opts.quality)
     }
 
     private static func resized(_ image: CGImage, toWidth w: Int) -> CGImage? {
@@ -145,18 +129,38 @@ enum NativeOps {
     // MARK: - PDF
 
     static func pdfFromImages(_ images: [URL], to output: URL) throws {
-        let doc = PDFDocument()
-        var idx = 0
+        guard !images.isEmpty else { throw ConvertError.badInput("Nothing to make a PDF from.") }
+        var mediaBox = CGRect(x: 0, y: 0, width: 612, height: 792)
+        guard let pdf = CGContext(output as CFURL, mediaBox: &mediaBox, nil) else {
+            throw ConvertError.badInput("Couldn't create \(output.lastPathComponent)")
+        }
         for url in images {
-            guard let img = NSImage(contentsOf: url), let page = PDFPage(image: img) else {
-                throw ConvertError.badInput("Couldn't read image: \(url.lastPathComponent)")
-            }
-            doc.insert(page, at: idx)
-            idx += 1
+            let img = try loadCGImage(url)
+            var box = CGRect(x: 0, y: 0, width: img.width, height: img.height)
+            pdf.beginPage(mediaBox: &box)
+            pdf.draw(img, in: box)
+            pdf.endPage()
         }
-        guard idx > 0, doc.write(to: output) else {
-            throw ConvertError.badInput("Failed to write \(output.lastPathComponent)")
-        }
+        pdf.closePDF()
+    }
+
+    /// Rasterize a PDF page to a CGImage. Pure Core Graphics — safe on any thread
+    /// (unlike NSImage.lockFocus, which these run off the main one).
+    private static func renderPage(_ page: PDFPage, scale: CGFloat) -> CGImage? {
+        let box = page.bounds(for: .mediaBox)
+        let w = Int((box.width * scale).rounded()), h = Int((box.height * scale).rounded())
+        guard w > 0, h > 0,
+              let ctx = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: 0,
+                                  space: CGColorSpaceCreateDeviceRGB(),
+                                  bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue) else { return nil }
+        ctx.setFillColor(CGColor(gray: 1, alpha: 1))
+        ctx.fill(CGRect(x: 0, y: 0, width: w, height: h))
+        ctx.saveGState()
+        ctx.scaleBy(x: scale, y: scale)
+        ctx.translateBy(x: -box.minX, y: -box.minY)
+        page.draw(with: .mediaBox, to: ctx)
+        ctx.restoreGState()
+        return ctx.makeImage()
     }
 
     private static func rasterizePDF(_ input: URL, into dir: URL, target: Format, opts: ConvertOptions) throws {
@@ -168,39 +172,12 @@ enum NativeOps {
         let stem = Naming.strippedStem(of: input)
 
         for i in 0..<doc.pageCount {
-            guard let page = doc.page(at: i) else { continue }
-            let box = page.bounds(for: .mediaBox)
-            let pixels = NSSize(width: box.width * scale, height: box.height * scale)
-            guard pixels.width >= 1, pixels.height >= 1 else { continue }
-
-            let img = NSImage(size: pixels)
-            img.lockFocus()
-            NSColor.white.setFill()
-            NSRect(origin: .zero, size: pixels).fill()
-            if let ctx = NSGraphicsContext.current?.cgContext {
-                ctx.saveGState()
-                ctx.scaleBy(x: scale, y: scale)
-                ctx.translateBy(x: -box.minX, y: -box.minY)
-                page.draw(with: .mediaBox, to: ctx)
-                ctx.restoreGState()
-            }
-            img.unlockFocus()
-
-            let out = dir.appendingPathComponent(String(format: "%@-%03d", stem, i + 1))
-                         .appendingPathExtension(target.ext)
-            guard let tiff = img.tiffRepresentation,
-                  let rep = NSBitmapImageRep(data: tiff) else {
+            guard let page = doc.page(at: i), let cg = renderPage(page, scale: scale) else {
                 throw ConvertError.badInput("Failed to render page \(i + 1)")
             }
-            let fileType: NSBitmapImageRep.FileType = target.id == "jpg" ? .jpeg : (target.id == "tiff" ? .tiff : .png)
-            var repProps: [NSBitmapImageRep.PropertyKey: Any] = [:]
-            if target.id == "jpg" {
-                repProps[.compressionFactor] = Double(opts.quality ?? 85) / 100.0
-            }
-            guard let data = rep.representation(using: fileType, properties: repProps) else {
-                throw ConvertError.badInput("Failed to encode page \(i + 1)")
-            }
-            try data.write(to: out)
+            let out = dir.appendingPathComponent(String(format: "%@-%03d", stem, i + 1))
+                         .appendingPathExtension(target.ext)
+            try writeCGImage(cg, to: out, id: target.id, quality: opts.quality ?? 85)
         }
     }
 
@@ -244,34 +221,40 @@ enum NativeOps {
         }
     }
 
-    /// Downsample every page to a JPEG and rebuild — the usual "shrink a PDF" trick.
+    /// Flatten every page to a JPEG at reduced DPI and rebuild — the standard
+    /// "shrink a PDF" move. All Core Graphics, no AppKit.
     static func pdfCompress(_ input: URL, to output: URL, quality: Int) throws {
         guard let doc = PDFDocument(url: input) else {
             throw ConvertError.badInput("Couldn't open PDF: \(input.lastPathComponent)")
         }
         let dpiScale: CGFloat = quality >= 75 ? 2.0 : (quality >= 50 ? 1.5 : 1.1)
-        let out = PDFDocument()
+        var mediaBox = CGRect(x: 0, y: 0, width: 612, height: 792)
+        guard let pdf = CGContext(output as CFURL, mediaBox: &mediaBox, nil) else {
+            throw ConvertError.badInput("Couldn't create \(output.lastPathComponent)")
+        }
         for i in 0..<doc.pageCount {
-            guard let page = doc.page(at: i) else { continue }
-            let box = page.bounds(for: .mediaBox)
-            let px = NSSize(width: max(1, box.width * dpiScale), height: max(1, box.height * dpiScale))
-            let img = NSImage(size: px)
-            img.lockFocus()
-            NSColor.white.setFill(); NSRect(origin: .zero, size: px).fill()
-            if let ctx = NSGraphicsContext.current?.cgContext {
-                ctx.saveGState(); ctx.scaleBy(x: dpiScale, y: dpiScale)
-                ctx.translateBy(x: -box.minX, y: -box.minY)
-                page.draw(with: .mediaBox, to: ctx); ctx.restoreGState()
-            }
-            img.unlockFocus()
-            guard let tiff = img.tiffRepresentation, let rep = NSBitmapImageRep(data: tiff),
-                  let jpeg = rep.representation(using: .jpeg, properties: [.compressionFactor: Double(quality) / 100.0]),
-                  let jImg = NSImage(data: jpeg), let pg = PDFPage(image: jImg) else {
+            guard let page = doc.page(at: i),
+                  let raster = renderPage(page, scale: dpiScale),
+                  let jpeg = jpegEncoded(raster, quality: quality) else {
                 throw ConvertError.badInput("Failed to compress page \(i + 1)")
             }
-            out.insert(pg, at: i)
+            var box = CGRect(origin: .zero, size: page.bounds(for: .mediaBox).size)
+            pdf.beginPage(mediaBox: &box)
+            pdf.draw(jpeg, in: box)
+            pdf.endPage()
         }
-        guard out.write(to: output) else { throw ConvertError.badInput("Failed to write \(output.lastPathComponent)") }
+        pdf.closePDF()
+    }
+
+    /// Round-trip a CGImage through a JPEG so it carries JPEG data, not raw
+    /// pixels — a CGPDFContext then embeds the JPEG stream as-is.
+    private static func jpegEncoded(_ image: CGImage, quality: Int) -> CGImage? {
+        let data = NSMutableData()
+        guard let dest = CGImageDestinationCreateWithData(data, UTType.jpeg.identifier as CFString, 1, nil) else { return nil }
+        CGImageDestinationAddImage(dest, image, [kCGImageDestinationLossyCompressionQuality: Double(quality) / 100.0] as CFDictionary)
+        guard CGImageDestinationFinalize(dest),
+              let src = CGImageSourceCreateWithData(data, nil) else { return nil }
+        return CGImageSourceCreateImageAtIndex(src, 0, nil)
     }
 
     static func pdfStripMetadata(_ input: URL, to output: URL) throws {

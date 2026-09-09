@@ -16,6 +16,8 @@ struct ArchiveConverter: Converter {
         return []
     }
 
+    func writesDirectory(from: Format, to: Format) -> Bool { to.id == "folder" }
+
     func plan(input: URL, from: Format, to: Format, output: URL, opts: ConvertOptions) throws -> Invocation {
         if to.id == "rar" { throw ConvertError.rarCreateUnsupported }
 

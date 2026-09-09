@@ -115,7 +115,8 @@ enum ToolRunner {
         var a = ["-hide_banner", "-loglevel", "error", "-y"]
 
         if tool == .trim {
-            a += ["-i", input.path, "-t", String(params.trimDuration ?? 10), "-c", "copy", output.path]
+            a += ["-i", input.path, "-t", String(params.trimDuration ?? 10),
+                  "-avoid_negative_ts", "make_zero", "-c", "copy", output.path]
             try runFF(bin, a); return
         }
         if tool == .stripMetadata {
@@ -160,7 +161,7 @@ enum ToolRunner {
     }
 
     private static func runFF(_ bin: String, _ args: [String]) throws {
-        let r = ProcessRun.run(bin, args)
+        let r = ProcessRun.run(bin, args, env: Engine.bundledEngineEnv(bin), timeout: 600)
         if r.code != 0 {
             throw ConvertError.processFailed(code: r.code, message: String((r.stderr.isEmpty ? r.stdout : r.stderr).suffix(500)))
         }
