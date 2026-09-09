@@ -11,7 +11,7 @@ Swift + AppKit, SwiftPM, **no Xcode**, ad-hoc-signed. Checks run as
 
 ## What it does
 
-**Convert** — drop files, pick a format tile (only the ones every dropped file
+**Convert** — drop files, pick a format petal (only the ones every dropped file
 can produce):
 
 | Class | Routes | Engine |
@@ -39,19 +39,21 @@ add them in Settings or `kuori watch add`.
 
 ## HUD
 
-Frameless, monochrome, keyboard-driven:
+A radial wheel, like Tangerine — the file in the hub, targets fanning out as
+petals. Monochrome, keyboard-driven:
 
 ```
-↑↓←→ move    ↵ run    ⌥ Tools    ⇥ cycle Convert / Tools / Recipes    esc close
+← → move    ↵ run    ⌥ Tools    ⇥ cycle Convert / Tools / Recipes    esc
 ```
 
-Drops and ⌘V both load files. Converts run on a background queue with a progress
-bar and auto-dismiss on success.
+Click a petal or arrow to it and press ↵. Drops and ⌘V both load files. Runs
+happen on a background queue with a progress readout and auto-dismiss on
+success.
 
 ## Build & run
 
 ```sh
-swift run Kuori --selftest             # 48 graph + logic checks
+swift run Kuori --selftest             # 50 graph + logic checks
 Scripts/build-app.sh 0.3.0             # -> dist/Kuori.app  (add --universal for arm64+x86_64)
 Scripts/make-dmg.sh 0.3.0             # -> dist/Kuori-0.3.0.dmg
 open dist/Kuori.app                    # menu-bar icon -> Drop Zone / Settings

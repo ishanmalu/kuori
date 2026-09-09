@@ -2,6 +2,11 @@
 
 ## 0.3.0 — Phases 3–5 (unreleased)
 
+- **Radial HUD**, à la Tangerine: the source file sits in the hub and the
+  targets fan out as rounded citrus-segment petals. Click a petal, or arrow to
+  it and press ↵. Icons on tool petals. ⌥ swaps Convert → Tools; ⇥ cycles
+  Convert / Tools / Recipes; a tool with presets opens its presets as a
+  sub-wheel (esc backs out). Still one ink / one paper, light + dark.
 - **Bundled engines**: `Scripts/collect-dylibs.py` (a deterministic
   dylibbundler replacement) vendors ffmpeg, ffprobe, vips, qpdf, 7zz, unar,
   resvg, potrace and pandoc plus ~86 dylibs into `Resources/engine/`, rewriting
