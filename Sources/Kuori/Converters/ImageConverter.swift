@@ -5,7 +5,10 @@ import Foundation
 /// NativeOps rasterizes in-process, so vips isn't required for the trace).
 struct ImageConverter: Converter {
     static let raster = ["jpg", "png", "webp", "heic", "avif", "tiff", "bmp", "gif"]
-    static let imageIOWritable: Set<String> = ["jpg", "png", "tiff", "heic", "gif", "bmp", "webp", "avif"]
+    static let imageIOWritable: Set<String> = ["jpg", "png", "tiff", "heic", "avif", "gif", "bmp"]
+    /// The vips builds we bundle have no libheif module — HEIC/AVIF on either
+    /// side goes through macOS ImageIO, which encodes and decodes both natively.
+    static let heifish: Set<String> = ["heic", "avif"]
 
     func targets(for input: Format) -> [Format] {
         guard input.category == .image else { return [] }
@@ -32,8 +35,9 @@ struct ImageConverter: Converter {
                               rasterizeInputToPGM: true)
         }
 
-        // Prefer vips; fall back to in-process ImageIO when it's unavailable.
-        if EngineLocator.path(for: .vips) == nil {
+        // ImageIO for HEIC/AVIF (bundled vips can't) and as the fallback when
+        // vips isn't installed at all.
+        if Self.heifish.contains(from.id) || Self.heifish.contains(to.id) || EngineLocator.path(for: .vips) == nil {
             guard Self.imageIOWritable.contains(to.id) else {
                 throw ConvertError.engineMissing(.vips)
             }

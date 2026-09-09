@@ -40,11 +40,14 @@ protocol Converter {
     /// Formats this converter can produce from `input` (excluding `input` itself).
     func targets(for input: Format) -> [Format]
     func plan(input: URL, from: Format, to: Format, output: URL, opts: ConvertOptions) throws -> Invocation
+    /// Converters that need bespoke, multi-step execution override this and
+    /// return true once they've written `output`. Default: fall through to `plan`.
+    /// Must be a protocol requirement (not just an extension) so calls through
+    /// the `Converter` existential dispatch dynamically.
+    func execute(input: URL, from: Format, to: Format, output: URL, opts: ConvertOptions) throws -> Bool
 }
 
 extension Converter {
-    /// Converters that need bespoke, multi-step execution override this and
-    /// return true once they've written `output`. Default: fall through to `plan`.
     func execute(input: URL, from: Format, to: Format, output: URL, opts: ConvertOptions) throws -> Bool { false }
 }
 
@@ -95,6 +98,20 @@ enum Engine {
         converters.first { $0.targets(for: from).contains(to) }
     }
 
+    /// When we run a binary from inside the app bundle, point glib away from any
+    /// Homebrew GIO/pixbuf module dirs so it never cross-loads a second libgio
+    /// (which triggers an ObjC class-duplicate warning, and worse on a bad day).
+    static func bundledEngineEnv(_ binPath: String) -> [String: String]? {
+        guard let res = Bundle.main.resourceURL?.appendingPathComponent("engine").path,
+              binPath.hasPrefix(res) else { return nil }
+        return [
+            "GIO_MODULE_DIR": "\(res)/nonexistent",
+            "GDK_PIXBUF_MODULEDIR": "\(res)/nonexistent",
+            "GSETTINGS_SCHEMA_DIR": "\(res)/nonexistent",
+            "G_MESSAGES_DEBUG": "",
+        ]
+    }
+
     /// Run a single file → single output conversion. Blocking; call off the main thread from the GUI.
     static func run(input: URL, to target: Format, output: URL, opts: ConvertOptions) throws {
         guard let from = Formats.byURL(input) else {
@@ -135,7 +152,7 @@ enum Engine {
         }
         defer { if let t = tmpPGM { try? FileManager.default.removeItem(at: t) } }
 
-        let r = ProcessRun.run(bin, args)
+        let r = ProcessRun.run(bin, args, env: bundledEngineEnv(bin))
         if r.code != 0 {
             let msg = r.stderr.isEmpty ? r.stdout : r.stderr
             throw ConvertError.processFailed(code: r.code, message: String(msg.suffix(600)))

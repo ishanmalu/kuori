@@ -75,13 +75,20 @@ kuori presets ; kuori recipes ; kuori formats ; kuori info movie.mkv
 
 ## Bundled engines
 
-The app finds Homebrew copies on a dev machine. For a self-contained `.app`:
+The app finds Homebrew copies on a dev machine. For a self-contained `.app`
+(~350 MB, DMG ~100 MB):
 
 ```sh
-brew install ffmpeg vips qpdf exiftool sevenzip unar potrace pandoc dylibbundler
-Scripts/bundle-engines.sh              # -> Resources/engine/ with dylibs relocated
+brew install ffmpeg vips qpdf sevenzip unar resvg potrace pandoc
+Scripts/bundle-engines.sh             # copies the binaries, then collect-dylibs.py
+                                     #   vendors ~86 dylibs into Resources/engine/libs/
+                                     #   and rewrites install names to @loader_path
 Scripts/build-app.sh 0.3.0
 ```
+
+`Scripts/collect-dylibs.py` is a small deterministic stand-in for `dylibbundler`
+(walks `otool -L`, copies, `install_name_tool`s, strips package-manager rpaths).
+HEIC/AVIF go through macOS ImageIO — the vips bottle ships without libheif.
 
 **LibreOffice** is bring-your-own: install it under `/Applications` (or drop a
 copy in `~/Library/Application Support/Kuori/engine/`) and Office↔PDF fidelity

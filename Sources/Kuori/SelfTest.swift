@@ -116,6 +116,10 @@ enum SelfTest {
         expect(Engine.targets(for: md).map(\.id).contains("pdf"), "md -> pdf offered")
         expect(Engine.targets(for: pdf).map(\.id).contains("txt"), "pdf -> txt offered")
         expect(Engine.converter(from: md, to: pdf) is DocConverter, "md->pdf routes to DocConverter")
+        expect(Engine.converter(from: md, to: Formats.byID["html"]!) is DocConverter, "md->html routes to DocConverter")
+        // `execute` is a protocol requirement so a call through the `Converter`
+        // existential dispatches to DocConverter, not the no-op extension default.
+        expect(Engine.converters.contains { type(of: $0) == DocConverter.self }, "DocConverter is registered")
 
         section("phase 4 — presets · recipes · tools")
         expect(Presets.named("web-jpg")?.target == "jpg", "preset lookup")

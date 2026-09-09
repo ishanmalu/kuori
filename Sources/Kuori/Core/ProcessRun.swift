@@ -10,11 +10,15 @@ enum ProcessRun {
     /// Run a binary to completion, capturing both streams. Blocking; call off
     /// the main thread from the GUI.
     @discardableResult
-    static func run(_ launchPath: String, _ args: [String], cwd: URL? = nil) -> ProcessOutcome {
+    static func run(_ launchPath: String, _ args: [String], cwd: URL? = nil,
+                    env: [String: String]? = nil) -> ProcessOutcome {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: launchPath)
         p.arguments = args
         if let cwd { p.currentDirectoryURL = cwd }
+        if let env {
+            p.environment = ProcessInfo.processInfo.environment.merging(env) { _, new in new }
+        }
 
         let outPipe = Pipe(), errPipe = Pipe()
         p.standardOutput = outPipe

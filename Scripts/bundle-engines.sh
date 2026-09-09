@@ -1,50 +1,34 @@
 #!/usr/bin/env bash
-# Pulls the conversion engines into Resources/engine/ with their dylibs
-# relocated to @loader_path, so Kuori.app is self-contained.
+# Pull the conversion engines into Resources/engine/ and make them self-contained.
 #
-#   Scripts/bundle-engines.sh            # ffmpeg vips qpdf exiftool 7zz unar (default set)
+#   Scripts/bundle-engines.sh            # default set
 #   Scripts/bundle-engines.sh ffmpeg     # just one
 #
-# Needs Homebrew for the source binaries and `dylibbundler`
-# (brew install dylibbundler). LibreOffice is intentionally NOT bundled here —
-# the app downloads it on demand into ~/Library/Application Support/Kuori/engine.
-set -euo pipefail
+# Copies the current Homebrew binaries, then Scripts/collect-dylibs.py walks
+# `otool -L`, vendors every non-system dylib into Resources/engine/libs/, and
+# rewrites install names + rpaths to @loader_path. LibreOffice is NOT bundled —
+# the app finds a /Applications install on demand.
+set -uo pipefail
 cd "$(dirname "$0")/.."
 
 DEST="Resources/engine"
-DEFAULT_SET=(ffmpeg ffprobe vips qpdf exiftool 7zz unar lsar resvg potrace pandoc)
-WANT=("${@:-${DEFAULT_SET[@]}}")
+DEFAULT_SET=(ffmpeg ffprobe vips qpdf 7zz unar resvg potrace pandoc)
+if [ "$#" -gt 0 ]; then WANT=("$@"); else WANT=("${DEFAULT_SET[@]}"); fi
 
 command -v brew >/dev/null || { echo "Homebrew required"; exit 1; }
-command -v dylibbundler >/dev/null || { echo "run: brew install dylibbundler"; exit 1; }
+mkdir -p "$DEST"
 
-mkdir -p "$DEST/libs"
-
-resolve() {
-  # map our engine name to a brew binary path
-  case "$1" in
-    ffmpeg|ffprobe) command -v "$1" ;;
-    vips)           command -v vips ;;
-    7zz)            command -v 7zz || command -v 7z ;;
-    *)              command -v "$1" || true ;;
-  esac
-}
+real() { python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$1"; }
 
 for name in "${WANT[@]}"; do
-  src="$(resolve "$name" || true)"
-  if [ -z "$src" ] || [ ! -x "$src" ]; then
-    echo "skip  $name (not installed)"
-    continue
-  fi
-  echo "bundle $name  <-  $src"
-  cp "$src" "$DEST/$name"
-  chmod +w "$DEST/$name"
-  dylibbundler -of -b -x "$DEST/$name" -d "$DEST/libs" -p '@loader_path/libs/' >/dev/null
-  codesign --force --sign - "$DEST/$name"
+  src="$(command -v "$name" 2>/dev/null || true)"
+  [ -z "$src" ] && src="$(command -v "${name/7zz/7z}" 2>/dev/null || true)"
+  if [ -z "$src" ] || [ ! -x "$src" ]; then echo "skip  $name (not installed)"; continue; fi
+  cp -f "$(real "$src")" "$DEST/$name"
+  chmod u+w "$DEST/$name"
+  echo "copied $name  <-  $(real "$src")"
 done
 
-find "$DEST/libs" -name '*.dylib' -exec codesign --force --sign - {} \; 2>/dev/null || true
-
-echo "==> $DEST populated. Verify no absolute paths leaked:"
-find "$DEST" -type f -perm -u+x -exec sh -c 'otool -L "$1" | grep -q /opt/homebrew && echo "  LEAK: $1"' _ {} \; || true
-echo "    (no LEAK lines above = good)"
+echo "==> collecting dylibs"
+python3 Scripts/collect-dylibs.py "$DEST"
+du -sh "$DEST"

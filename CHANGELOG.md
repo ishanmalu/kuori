@@ -2,6 +2,20 @@
 
 ## 0.3.0 — Phases 3–5 (unreleased)
 
+- **Bundled engines**: `Scripts/collect-dylibs.py` (a deterministic
+  dylibbundler replacement) vendors ffmpeg, ffprobe, vips, qpdf, 7zz, unar,
+  resvg, potrace and pandoc plus ~86 dylibs into `Resources/engine/`, rewriting
+  every install name and stray rpath to `@loader_path`. `Kuori.app` now runs
+  every route with nothing on `PATH` (verified: webp/avif/heic/svg-trace/gif,
+  md→html/docx/rtf, OCR, resize). DMG ≈ 101 MB.
+- HEIC/AVIF (both directions) route to macOS ImageIO — the vips bottle has no
+  libheif module.
+- Bundled binaries launch with `GIO_MODULE_DIR` etc. pointed away from any
+  Homebrew glib, so vips never cross-loads a second libgio.
+- Fix: `Converter.execute` is now a protocol requirement, so multi-step routes
+  (e.g. `md → html`) dispatch to `DocConverter` instead of the no-op default.
+
+
 - **Documents**: pandoc for md/html/rtf/txt/epub/docx/odt round-trips;
   LibreOffice (bring-your-own) for Office ↔ PDF fidelity; PDF → txt native.
   pptx/xlsx/odp/ods registered. Multi-step routes (Markdown → PDF) handled in
