@@ -1,6 +1,17 @@
 # Changelog
 
-## 0.3.0 — Phases 3–5 (unreleased)
+## 0.3.1
+
+- Universal binary — the app now carries both arm64 and x86_64 slices.
+- `EngineLocator` reads each engine's Mach-O header and skips slices it can't
+  run, so the arm64 bundled engines are ignored on Intel and the search falls
+  through to `/usr/local/bin` instead of trying to exec something that can't
+  start. Applies to all three lookup tiers.
+- Verified by running the x86_64 slice under Rosetta: 54/54 checks, bundled
+  engines correctly skipped, native routes (ImageIO, PDFKit, Vision, bsdtar)
+  all still converting.
+
+## 0.3.0
 
 - **Radial HUD**, à la Tangerine: the source file sits in the hub and the
   targets fan out as rounded citrus-segment petals. Click a petal, or arrow to
@@ -19,7 +30,6 @@
   Homebrew glib, so vips never cross-loads a second libgio.
 - Fix: `Converter.execute` is now a protocol requirement, so multi-step routes
   (e.g. `md → html`) dispatch to `DocConverter` instead of the no-op default.
-
 
 - **Documents**: pandoc for md/html/rtf/txt/epub/docx/odt round-trips;
   LibreOffice (bring-your-own) for Office ↔ PDF fidelity; PDF → txt native.
@@ -42,7 +52,7 @@
   GitHub Actions CI on `macos-15`.
 - 48 self-test checks.
 
-## 0.2.0 — Phase 2 (unreleased)
+## 0.2.0
 
 - **Tools** (`⌥` in the HUD / `kuori tool …`): Resize, Compress, Crop-to-aspect,
   Strip metadata, Trim (A/V), Merge PDF, Split PDF — same-format edits that write
@@ -57,7 +67,7 @@
   progress bar, auto-dismiss on success. Still one ink / one paper.
 - `kuori tool|merge|split` on the CLI; `Kuori --shot-ui <png> [dark] [tools]`.
 
-## 0.1.0 — Phase 1 (unreleased)
+## 0.1.0
 
 First working slice.
 

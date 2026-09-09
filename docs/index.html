@@ -220,14 +220,14 @@ footer{border-top:1px solid var(--line); padding:44px 0 70px; color:var(--faint)
 <main>
 
 <div class="wrap hero">
-  <span class="pill"><b><i class="dot"></i> v0.3</b> · macOS 14+ · Apple Silicon</span>
+  <span class="pill"><b><i class="dot"></i> v0.3.1</b> · macOS 14+ · Universal</span>
   <h1>The converter that<br><span class="grad">comes to you.</span></h1>
   <p class="lede">Hold Shift, drag a file, drop it on a petal. Kuori puts a wheel of every
     format that file can become right where you are — and converts it on your Mac,
     without uploading a thing.</p>
   <div class="actions">
     <a class="btn" href="https://github.com/ishanmalu/kuori/releases/latest">Download for Mac
-      <span>0.3.0 · 101 MB</span></a>
+      <span>0.3.1 · Universal · 101 MB</span></a>
     <a class="btn ghost" href="https://github.com/ishanmalu/kuori">View source</a>
   </div>
   <div class="keys">
@@ -417,8 +417,8 @@ footer{border-top:1px solid var(--line); padding:44px 0 70px; color:var(--faint)
       licensed — Swift and AppKit, SwiftPM, no Xcode project, safety checks inside the
       binary.</p>
     <div class="actions rv" style="justify-content:flex-start; margin:0 0 30px">
-      <a class="btn" href="https://github.com/ishanmalu/kuori/releases/latest">Download 0.3.0
-        <span>macOS 14+ · Apple Silicon</span></a>
+      <a class="btn" href="https://github.com/ishanmalu/kuori/releases/latest">Download 0.3.1
+        <span>macOS 14+ · Intel &amp; Apple Silicon</span></a>
     </div>
     <div class="rv">
       <div class="codehead"><i></i><i></i><i></i></div>
@@ -430,9 +430,11 @@ Scripts/build-app.sh 0.3.0        <span class="c"># → dist/Kuori.app</span></p
     </div>
     <div class="note rv" style="margin-top:24px">
       <span style="color:var(--neon)">◆</span>
-      <div>Apple Silicon, macOS 14 or later. The bundled build is around <b>350 MB</b> because
-        nine engines and ~86 dylibs live inside it; without them Kuori falls back to whatever
-        is on your <code class="mono">PATH</code>.</div>
+      <div>Universal, macOS 14 or later. The download is <b>101 MB</b> because nine engines
+        and ~86 dylibs ship inside it. Those are arm64 — Homebrew stopped publishing Intel
+        bottles for some of them — so on an Intel Mac every native route still works
+        (images, PDF, OCR, background removal, zip) and the rest light up with
+        <code class="mono">brew install ffmpeg vips pandoc …</code>.</div>
     </div>
   </div>
 </section>

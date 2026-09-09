@@ -141,6 +141,17 @@ enum SelfTest {
             expect(back.folder == "/tmp/x" && back.toFormat == "webp" && back.enabled, "watch rule json round-trips")
         } else { expect(false, "watch rule json round-trips") }
 
+        section("architecture gate")
+        // The running binary always matches the host, so this is the honest fixture.
+        expect(EngineLocator.runnable(CommandLine.arguments[0]), "our own binary reads as runnable")
+        expect(!EngineLocator.runnable("/nonexistent/engine"), "missing file isn't runnable")
+        expect(EngineLocator.runnable("/usr/bin/bsdtar"), "a system Mach-O reads as runnable")
+        let script = FileManager.default.temporaryDirectory
+            .appendingPathComponent("kuori-arch-\(UUID().uuidString).sh")
+        try? "#!/bin/sh\necho hi\n".write(to: script, atomically: true, encoding: .utf8)
+        expect(EngineLocator.runnable(script.path), "non-Mach-O script is left to the OS")
+        try? FileManager.default.removeItem(at: script)
+
         section("engine availability (informational)")
         for id in [EngineID.ffmpeg, .vips, .resvg, .potrace, .pandoc, .qpdf, .sevenzip, .unar, .bsdtar, .exiftool] {
             let where_ = EngineLocator.path(for: id) ?? "— not found (bundle or brew install)"

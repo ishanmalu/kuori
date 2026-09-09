@@ -6,8 +6,8 @@ converts it on your Mac — nothing is uploaded, ever.
 
 *Kuori* is Finnish for **peel**: you drop a file in and the format comes away.
 
-[**Download 0.3.0**](https://github.com/ishanmalu/kuori/releases/latest) ·
-[Site](https://ishanmalu.github.io/kuori/) · macOS 14+ · Apple Silicon · MIT
+[**Download 0.3.1**](https://github.com/ishanmalu/kuori/releases/latest) ·
+[Site](https://ishanmalu.github.io/kuori/) · macOS 14+ · Universal · MIT
 
 A menu-bar wheel and a `kuori` CLI over one conversion engine, with nine
 converters bundled inside the app so it runs on a machine with nothing
@@ -87,6 +87,23 @@ kuori merge a.pdf b.pdf ; kuori split book.pdf
 kuori recipe square-jpg *.png
 kuori watch add ~/Dropbox/Incoming --to webp
 kuori presets ; kuori recipes ; kuori formats ; kuori info movie.mkv
+```
+
+## Intel Macs
+
+The app is a universal binary and every native route — images through ImageIO,
+images ↔ PDF, PDF pages, OCR, background removal, resize/crop/compress, and
+folder ↔ zip/tar via the system `bsdtar` — works on Intel with nothing else
+installed.
+
+The nine bundled engines are arm64 only: Homebrew no longer publishes x86_64
+bottles for pandoc, qpdf or sevenzip, so a fully bundled universal build can't
+be assembled. `EngineLocator` reads each Mach-O header and skips any slice it
+can't run, so on Intel it falls straight through to `/usr/local/bin`. To light
+up video, audio, WebP, SVG and documents there:
+
+```sh
+brew install ffmpeg vips resvg potrace unar qpdf sevenzip pandoc
 ```
 
 ## Bundled engines
