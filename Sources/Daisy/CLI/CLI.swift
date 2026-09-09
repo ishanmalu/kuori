@@ -1,6 +1,6 @@
 import Foundation
 
-/// `Kuori convert …`, `Kuori formats`, `Kuori info <file>`. Shares the exact
+/// `Daisy convert …`, `Daisy formats`, `Daisy info <file>`. Shares the exact
 /// conversion path the GUI uses, so anything the app can do is scriptable.
 enum CLI {
     static func run(_ args: [String]) -> Int32 {
@@ -65,7 +65,7 @@ enum CLI {
             i += 1
         }
 
-        // Two-positional form with no --to: `kuori convert in.png out.webp`
+        // Two-positional form with no --to: `daisy convert in.png out.webp`
         if toID == nil, inputs.count == 2,
            let outFmt = Formats.byURL(inputs[1]) ?? Formats.byExtension(inputs[1].pathExtension),
            !FileManager.default.fileExists(atPath: inputs[1].path) {
@@ -104,7 +104,7 @@ enum CLI {
     private static func tool(_ args: [String]) -> Int32 {
         guard let name = args.first,
               let t = Tool.allCases.first(where: { $0.rawValue.lowercased() == name.lowercased() || $0.label.lowercased() == name.lowercased() }) else {
-            err("usage: kuori tool <\(Tool.allCases.map(\.rawValue).joined(separator: "|"))> <files…> [--preset L] [--quality N] [--scale PCT] [--max-edge N] [--aspect A:B] [--seconds S] [--out DIR]")
+            err("usage: daisy tool <\(Tool.allCases.map(\.rawValue).joined(separator: "|"))> <files…> [--preset L] [--quality N] [--scale PCT] [--max-edge N] [--aspect A:B] [--seconds S] [--out DIR]")
             return 2
         }
         var inputs: [URL] = []
@@ -153,7 +153,7 @@ enum CLI {
 
     private static func recipe(_ args: [String]) -> Int32 {
         guard let name = args.first, let r = Recipes.named(name) else {
-            err("usage: kuori recipe <name> <files…> [--out <dir>]   (see: kuori recipes)")
+            err("usage: daisy recipe <name> <files…> [--out <dir>]   (see: daisy recipes)")
             return 2
         }
         var into: URL?
@@ -205,18 +205,18 @@ enum CLI {
                 i += 1
             }
             guard !rule.folder.isEmpty, (rule.toFormat != nil || rule.recipe != nil) else {
-                err("usage: kuori watch add <dir> (--to <fmt> | --recipe <name>) [--quality N]"); return 2
+                err("usage: daisy watch add <dir> (--to <fmt> | --recipe <name>) [--quality N]"); return 2
             }
             w.add(rule)
             print("watching \(rule.folder)")
             return 0
         case "remove", "rm":
-            guard let n = args.dropFirst().first.flatMap(Int.init) else { err("usage: kuori watch remove <index>"); return 2 }
+            guard let n = args.dropFirst().first.flatMap(Int.init) else { err("usage: daisy watch remove <index>"); return 2 }
             w.remove(at: n); print("removed \(n)"); return 0
         case "run":
             w.sweepAll(); print("swept \(w.rules.count) folder(s)"); return 0
         default:
-            err("usage: kuori watch [list | add <dir> --to <fmt> | remove <n> | run]"); return 2
+            err("usage: daisy watch [list | add <dir> --to <fmt> | remove <n> | run]"); return 2
         }
     }
 
@@ -240,7 +240,7 @@ enum CLI {
     }
 
     private static func info(_ args: [String]) -> Int32 {
-        guard let path = args.first else { err("usage: kuori info <file>"); return 2 }
+        guard let path = args.first else { err("usage: daisy info <file>"); return 2 }
         let url = URL(fileURLWithPath: path)
         guard let f = Formats.byURL(url) else { err("unrecognized: \(path)"); return 1 }
         print("\(url.lastPathComponent)")
@@ -251,29 +251,29 @@ enum CLI {
 
     private static func usage() {
         print("""
-        Kuori — local file converter
+        Daisy — local file converter
 
-          kuori convert <files…> --to <format> [--out <dir>] [--quality 1-100]
+          daisy convert <files…> --to <format> [--out <dir>] [--quality 1-100]
                        [--scale WxH] [--strip] [--overwrite | --skip-existing]
-          kuori convert <in> <out>          two-file form, target inferred from <out>
+          daisy convert <in> <out>          two-file form, target inferred from <out>
 
-          kuori tool <name> <files…>        same-format edits — name is one of:
+          daisy tool <name> <files…>        same-format edits — name is one of:
                        resize | compress | crop | stripMetadata | trim | pdfMerge | pdfSplit
                        [--preset L] [--quality N] [--scale PCT] [--max-edge N]
                        [--aspect A:B] [--seconds S] [--out <dir>]
-          kuori merge <pdfs/images…>        alias for: tool pdfMerge
-          kuori split <file.pdf>            alias for: tool pdfSplit
+          daisy merge <pdfs/images…>        alias for: tool pdfMerge
+          daisy split <file.pdf>            alias for: tool pdfSplit
 
-          kuori recipe <name> <files…>      run a saved multi-step pipeline
-          kuori recipes                     list recipes
-          kuori convert … --preset <name>   apply a saved preset
-          kuori presets                     list presets
+          daisy recipe <name> <files…>      run a saved multi-step pipeline
+          daisy recipes                     list recipes
+          daisy convert … --preset <name>   apply a saved preset
+          daisy presets                     list presets
 
-          kuori watch add <dir> --to <fmt>  auto-convert new files in <dir>
-          kuori watch [list | remove <n> | run]
+          daisy watch add <dir> --to <fmt>  auto-convert new files in <dir>
+          daisy watch [list | remove <n> | run]
 
-          kuori formats                     what converts to what
-          kuori info <file>                 identify a file and its routes
+          daisy formats                     what converts to what
+          daisy info <file>                 identify a file and its routes
         """)
     }
 

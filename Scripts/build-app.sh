@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds Kuori.app into dist/. Usage: Scripts/build-app.sh [version] [--universal]
+# Builds Daisy.app into dist/. Usage: Scripts/build-app.sh [version] [--universal]
 #
 # Default: a single-arch build for this Mac. --universal builds arm64 + x86_64
 # and stitches them with lipo (there is no multi-arch SwiftPM build without
@@ -18,7 +18,7 @@ for a in "$@"; do
   esac
 done
 
-APP="dist/Kuori.app"
+APP="dist/Daisy.app"
 mkdir -p dist
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
@@ -27,23 +27,23 @@ if [ "$UNIVERSAL" -eq 1 ]; then
   echo "==> Building release binary (universal)"
   swift build -c release --scratch-path .build/arm64 -Xswiftc -target -Xswiftc arm64-apple-macos14.0
   swift build -c release --scratch-path .build/x86_64 -Xswiftc -target -Xswiftc x86_64-apple-macos14.0
-  lipo -create -output "$APP/Contents/MacOS/Kuori" \
-    .build/arm64/release/Kuori .build/x86_64/release/Kuori
-  lipo -archs "$APP/Contents/MacOS/Kuori"
+  lipo -create -output "$APP/Contents/MacOS/Daisy" \
+    .build/arm64/release/Daisy .build/x86_64/release/Daisy
+  lipo -archs "$APP/Contents/MacOS/Daisy"
 else
   ARCH="$(uname -m)"
   echo "==> Building release binary ($ARCH)"
   swift build -c release --scratch-path .build/rel -Xswiftc -target -Xswiftc "${ARCH}-apple-macos14.0"
-  cp ".build/rel/release/Kuori" "$APP/Contents/MacOS/Kuori"
+  cp ".build/rel/release/Daisy" "$APP/Contents/MacOS/Daisy"
 fi
 
 echo "==> Assembling bundle"
-if [ ! -f Resources/Kuori.icns ]; then
+if [ ! -f Resources/Daisy.icns ]; then
   echo "==> Generating icon"
   swift Scripts/makeicon.swift Resources >/dev/null
-  iconutil -c icns Resources/Kuori.iconset -o Resources/Kuori.icns
+  iconutil -c icns Resources/Daisy.iconset -o Resources/Daisy.icns
 fi
-cp Resources/Kuori.icns "$APP/Contents/Resources/Kuori.icns"
+cp Resources/Daisy.icns "$APP/Contents/Resources/Daisy.icns"
 sed "s/__VERSION__/$VERSION/g" Resources/Info.plist > "$APP/Contents/Info.plist"
 
 if [ -d Resources/engine ]; then

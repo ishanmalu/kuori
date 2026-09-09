@@ -22,8 +22,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
         menu.addItem(.separator())
         let ver = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
-        menu.addItem(withTitle: "Kuori \(ver)", action: nil, keyEquivalent: "").isEnabled = false
-        menu.addItem(withTitle: "Quit Kuori", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        menu.addItem(withTitle: "Daisy \(ver)", action: nil, keyEquivalent: "").isEnabled = false
+        menu.addItem(withTitle: "Quit Daisy", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         menu.items.forEach { $0.target = self }
         statusItem.menu = menu
     }
@@ -32,7 +32,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func chooseAndConvert() { DropPanel.shared.summonAndChoose() }
     @objc private func openSettings() { SettingsWindow.shared.show() }
 
-    /// Finder → Services → "Convert with Kuori…"
+    /// Finder → Services → "Convert with Daisy…"
     @objc func convertFiles(_ pboard: NSPasteboard, userData: String, error: AutoreleasingUnsafeMutablePointer<NSString>) {
         let opts: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
         guard let urls = pboard.readObjects(forClasses: [NSURL.self], options: opts) as? [URL], !urls.isEmpty else { return }
@@ -44,28 +44,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return true
     }
 
-    /// A peel curl — the app icon reduced to a monochrome template stroke so the
-    /// menu bar tints it for light/dark automatically.
+    /// The flower reduced to a monochrome template, so the menu bar tints it for
+    /// light and dark automatically. Solid petals rather than outlines — at 18pt
+    /// a stroked petal closes up into a blob.
     private static func menuBarIcon() -> NSImage {
         let d: CGFloat = 18
         let img = NSImage(size: NSSize(width: d, height: d))
         img.lockFocus()
         let c = CGPoint(x: d / 2, y: d / 2)
-        let path = NSBezierPath()
-        path.lineWidth = 1.5
-        path.lineCapStyle = .round
-        let turns = 1.15, thetaMax = turns * 2 * .pi
-        let rOuter = d * 0.40, rInner = d * 0.10
-        let steps = 120
-        for i in 0...steps {
-            let t = CGFloat(i) / CGFloat(steps)
-            let theta = CGFloat(thetaMax) * t
-            let r = rOuter - (rOuter - rInner) * t
-            let p = CGPoint(x: c.x + cos(theta) * r, y: c.y + sin(theta) * r)
-            i == 0 ? path.move(to: p) : path.line(to: p)
+        let petals = 8
+        let step = (CGFloat.pi * 2) / CGFloat(petals)
+        let petalR = d * 0.145            // radius of one round petal
+        let ring = d * 0.275              // distance from centre to petal centre
+
+        NSColor.black.setFill()
+        for i in 0..<petals {
+            let a = CGFloat.pi / 2 - CGFloat(i) * step
+            let p = CGPoint(x: c.x + cos(a) * ring, y: c.y + sin(a) * ring)
+            NSBezierPath(ovalIn: CGRect(x: p.x - petalR, y: p.y - petalR,
+                                        width: petalR * 2, height: petalR * 2)).fill()
         }
-        NSColor.black.setStroke()
-        path.stroke()
+        // The centre is punched out rather than drawn, so the template reads as a
+        // flower at 18pt instead of a filled circle.
+        let hubR = d * 0.135
+        let hub = NSBezierPath(ovalIn: CGRect(x: c.x - hubR, y: c.y - hubR,
+                                              width: hubR * 2, height: hubR * 2))
+        NSGraphicsContext.current?.compositingOperation = .clear
+        hub.fill()
+        NSGraphicsContext.current?.compositingOperation = .sourceOver
+
         img.unlockFocus()
         img.isTemplate = true
         return img

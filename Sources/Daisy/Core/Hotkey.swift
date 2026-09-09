@@ -16,7 +16,7 @@ enum Hotkey {
         installHandler()
 
         if let ref { UnregisterEventHotKey(ref); Self.ref = nil }
-        let id = EventHotKeyID(signature: OSType(0x4B554F52 /* 'KUOR' */), id: 1)
+        let id = EventHotKeyID(signature: OSType(0x44415359 /* 'DASY' */), id: 1)
         let mods = UInt32(optionKey | shiftKey)
         var newRef: EventHotKeyRef?
         let status = RegisterEventHotKey(UInt32(kVK_ANSI_V), mods, id,
@@ -24,7 +24,7 @@ enum Hotkey {
         if status == noErr {
             ref = newRef
         } else {
-            NSLog("Kuori: couldn't register \(label) (status \(status)) — another app may hold it")
+            NSLog("Daisy: couldn't register \(label) (status \(status)) — another app may hold it")
         }
     }
 

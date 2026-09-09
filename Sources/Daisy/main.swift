@@ -52,8 +52,10 @@ if args.first == "--demo" {
     let panel = DropPanel.shared
     if args.contains("light") { app.appearance = NSAppearance(named: .aqua) }
     if args.contains("dark") { app.appearance = NSAppearance(named: .darkAqua) }
-    let files = args.dropFirst().filter { $0 != "light" && $0 != "dark" }.map { URL(fileURLWithPath: $0) }
+    let files = args.dropFirst().filter { !["light", "dark", "tools", "recipes"].contains($0) }.map { URL(fileURLWithPath: $0) }
     files.isEmpty ? panel.showCentered() : panel.load(urls: files)
+    if args.contains("tools") { panel.previewMode("tools") }
+    if args.contains("recipes") { panel.previewMode("recipes") }
     app.run()
 }
 

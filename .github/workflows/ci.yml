@@ -14,4 +14,4 @@ jobs:
       - name: Build
         run: swift build -c release
       - name: Self-test
-        run: swift run -c release Kuori --selftest
+        run: swift run -c release Daisy --selftest

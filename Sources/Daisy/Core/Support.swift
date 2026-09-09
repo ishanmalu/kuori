@@ -1,11 +1,11 @@
 import Foundation
 
-/// `~/Library/Application Support/Kuori` — config (presets, recipes, watch
+/// `~/Library/Application Support/Daisy` — config (presets, recipes, watch
 /// folders) and on-demand engines live here.
 enum Support {
     static var dir: URL {
         let u = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/Kuori", isDirectory: true)
+            .appendingPathComponent("Library/Application Support/Daisy", isDirectory: true)
         try? FileManager.default.createDirectory(at: u, withIntermediateDirectories: true)
         return u
     }

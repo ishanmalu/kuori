@@ -1,6 +1,6 @@
 import Foundation
 
-/// `Kuori --selftest` runs the checks that must hold for the conversion graph to
+/// `Daisy --selftest` runs the checks that must hold for the conversion graph to
 /// be coherent, then exits non-zero on any failure. XCTest isn't in the Command
 /// Line Tools SDK, so tests ship in the binary and run anywhere, including CI
 /// where no engines are installed.
@@ -16,7 +16,7 @@ enum SelfTest {
     private static func section(_ name: String) { print("\n\(name)") }
 
     static func run() -> Never {
-        print("Kuori self-test\n")
+        print("Daisy self-test\n")
 
         section("format resolution")
         expect(Formats.byExtension("jpeg")?.id == "jpg", "jpeg alias -> jpg")
@@ -69,7 +69,7 @@ enum SelfTest {
 
         section("output naming")
         let tmp = FileManager.default.temporaryDirectory
-            .appendingPathComponent("kuori-selftest-\(UUID().uuidString)")
+            .appendingPathComponent("daisy-selftest-\(UUID().uuidString)")
         try? FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: tmp) }
         let srcA = tmp.appendingPathComponent("photo.png")
@@ -147,14 +147,14 @@ enum SelfTest {
         expect(!EngineLocator.runnable("/nonexistent/engine"), "missing file isn't runnable")
         expect(EngineLocator.runnable("/usr/bin/bsdtar"), "a system Mach-O reads as runnable")
         let script = FileManager.default.temporaryDirectory
-            .appendingPathComponent("kuori-arch-\(UUID().uuidString).sh")
+            .appendingPathComponent("daisy-arch-\(UUID().uuidString).sh")
         try? "#!/bin/sh\necho hi\n".write(to: script, atomically: true, encoding: .utf8)
         expect(EngineLocator.runnable(script.path), "non-Mach-O script is left to the OS")
         try? FileManager.default.removeItem(at: script)
 
         section("folder drops")
         let fm = FileManager.default
-        let root = fm.temporaryDirectory.appendingPathComponent("kuori-inputset-\(UUID().uuidString)")
+        let root = fm.temporaryDirectory.appendingPathComponent("daisy-inputset-\(UUID().uuidString)")
         let photos = root.appendingPathComponent("photos")
         try? fm.createDirectory(at: photos.appendingPathComponent("nested"), withIntermediateDirectories: true)
         for n in ["b.png", "a.png", "c.jpg"] {

@@ -162,13 +162,13 @@ enum Engine {
         var staged: URL?
         if plan.rasterizeInputToPGM {
             let tmp = FileManager.default.temporaryDirectory
-                .appendingPathComponent("kuori-\(UUID().uuidString).pgm")
+                .appendingPathComponent("daisy-\(UUID().uuidString).pgm")
             try NativeOps.writeGrayPGM(input, to: tmp)
             staged = tmp
             args = args.map { $0 == "{PGM}" ? tmp.path : $0 }
         } else if plan.stageInputAsPNG {
             let tmp = FileManager.default.temporaryDirectory
-                .appendingPathComponent("kuori-\(UUID().uuidString).png")
+                .appendingPathComponent("daisy-\(UUID().uuidString).png")
             try NativeOps.stagePNG(input, to: tmp, opts: opts)
             staged = tmp
             args = args.map { $0 == "{PNG}" ? tmp.path : $0 }

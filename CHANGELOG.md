@@ -25,13 +25,13 @@
 
 ## 0.4.0
 
-- **Licence: PolyForm Noncommercial 1.0.0.** Kuori is free to use, read, modify
+- **Licence: PolyForm Noncommercial 1.0.0.** Daisy is free to use, read, modify
   and pass around for anything that isn't commercial. Commercial use is a
   conversation, not a download.
 - **The bundle is GPL-free.** ffmpeg, pandoc and potrace are gone from the DMG
   (GPL-3 / GPL-2), and so is libvips — its bottle hard-links libfftw3 (GPL-2)
   and libimagequant (GPL-3), and removing either dylib stops vips loading at
-  all. Kuori still finds every one of them on `PATH`; only redistribution
+  all. Daisy still finds every one of them on `PATH`; only redistribution
   changed. `Resources/engine` went 350 MB → 20 MB.
 - **cwebp (BSD-3) replaces vips for WebP**, the one raster format macOS decodes
   but won't encode. Any input ImageIO can read is staged through a temp PNG
@@ -64,7 +64,7 @@
 - **Bundled engines**: `Scripts/collect-dylibs.py` (a deterministic
   dylibbundler replacement) vendors ffmpeg, ffprobe, vips, qpdf, 7zz, unar,
   resvg, potrace and pandoc plus ~86 dylibs into `Resources/engine/`, rewriting
-  every install name and stray rpath to `@loader_path`. `Kuori.app` now runs
+  every install name and stray rpath to `@loader_path`. `Daisy.app` now runs
   every route with nothing on `PATH` (verified: webp/avif/heic/svg-trace/gif,
   md→html/docx/rtf, OCR, resize). DMG ≈ 101 MB.
 - HEIC/AVIF (both directions) route to macOS ImageIO — the vips bottle has no
@@ -78,13 +78,13 @@
   LibreOffice (bring-your-own) for Office ↔ PDF fidelity; PDF → txt native.
   pptx/xlsx/odp/ods registered. Multi-step routes (Markdown → PDF) handled in
   `DocConverter.execute`.
-- **Presets** (`Presets`, `presets.json`): named format + options, `kuori
-  convert --preset`, `kuori presets`. Six built-ins.
+- **Presets** (`Presets`, `presets.json`): named format + options, `daisy
+  convert --preset`, `daisy presets`. Six built-ins.
 - **Recipes** (`Recipe` / `RecipeRunner`, `recipes.json`): ordered convert/tool
-  pipelines chained through temp files. `kuori recipe`, HUD Recipes mode. Five
+  pipelines chained through temp files. `daisy recipe`, HUD Recipes mode. Five
   built-ins.
 - **Watch folders** (`WatchFolders`, FSEvents, in-process): auto-convert new
-  files by format or recipe, move originals to `_processed/`. `kuori watch
+  files by format or recipe, move originals to `_processed/`. `daisy watch
   add|list|remove|run`, Settings table.
 - **Native tools**: OCR → searchable PDF (Vision text layer, invisible), Remove
   background (VisionKit foreground mask → transparent PNG).
@@ -97,7 +97,7 @@
 
 ## 0.2.0
 
-- **Tools** (`⌥` in the HUD / `kuori tool …`): Resize, Compress, Crop-to-aspect,
+- **Tools** (`⌥` in the HUD / `daisy tool …`): Resize, Compress, Crop-to-aspect,
   Strip metadata, Trim (A/V), Merge PDF, Split PDF — same-format edits that write
   a new file (`name-resized.jpg`). Presets (¼ / ½ / ≤1920 …, Light/Medium/Strong,
   1:1 / 4:5 / 16:9 / 9:16).
@@ -108,19 +108,19 @@
 - **HUD redesign**: frameless card, keyboard-driven (arrows move · ↵ run · ⌥
   Tools · Tab locks mode · esc close), category-grouped format tiles, a thin
   progress bar, auto-dismiss on success. Still one ink / one paper.
-- `kuori tool|merge|split` on the CLI; `Kuori --shot-ui <png> [dark] [tools]`.
+- `daisy tool|merge|split` on the CLI; `Daisy --shot-ui <png> [dark] [tools]`.
 
 ## 0.1.0
 
 First working slice.
 
-- Conversion engine with a declarative capability graph (`Sources/Kuori/Core/Engine.swift`).
+- Conversion engine with a declarative capability graph (`Sources/Daisy/Core/Engine.swift`).
 - Converters: images (libvips + ImageIO fallback), audio/video (ffmpeg),
   video → GIF, images ↔ PDF (PDFKit), folder ↔ zip/tar/tar.gz/7z, archive extraction.
-- `kuori` CLI: `convert`, `formats`, `info` — same path the GUI uses.
+- `daisy` CLI: `convert`, `formats`, `info` — same path the GUI uses.
 - Menu-bar app with a floating Drop Zone; multi-file drops offer the intersection
-  of each file's routes. Finder Services entry ("Convert with Kuori…").
-- `Kuori --selftest`: format resolution, graph integrity, argument builders,
+  of each file's routes. Finder Services entry ("Convert with Daisy…").
+- `Daisy --selftest`: format resolution, graph integrity, argument builders,
   output naming/collision, engine availability report.
 - `Scripts/build-app.sh` (arm64, ad-hoc signed), `Scripts/bundle-engines.sh`
   (dylib relocation), `Scripts/makeicon.swift` (icon drawn in code).

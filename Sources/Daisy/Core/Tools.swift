@@ -1,6 +1,6 @@
 import Foundation
 
-/// Same-format edits (the ⌥ mode in the HUD, and `kuori tool …` on the CLI).
+/// Same-format edits (the ⌥ mode in the HUD, and `daisy tool …` on the CLI).
 /// A conversion changes the container; a tool keeps it and rewrites the bytes.
 enum Tool: String, CaseIterable {
     case resize, compress, crop, stripMetadata, trim

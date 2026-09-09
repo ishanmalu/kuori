@@ -3,19 +3,19 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Kuori — File Converter for Mac</title>
+<title>Daisy — File Converter for Mac</title>
 <meta name="description" content="A local file converter for macOS. Hold Shift, drag a file, drop it on a petal. Images, audio, video, documents, archives — all on-device, nothing uploaded.">
 <link rel="icon" href="img/icon.png">
-<meta property="og:title" content="Kuori — File Converter for Mac">
+<meta property="og:title" content="Daisy — File Converter for Mac">
 <meta property="og:description" content="Hold Shift, drag a file, drop it on a petal. Everything runs on your Mac.">
 <meta property="og:image" content="img/wheel-convert.png">
 <meta name="theme-color" content="#08090a">
 <style>
 :root{
-  --neon:#4dff8b;
-  --neon-2:#38e8ff;
-  --neon-dim:rgba(77,255,139,.13);
-  --neon-line:rgba(77,255,139,.30);
+  --accent:#ffcc29;
+  --accent-2:#ffa60d;
+  --accent-soft:rgba(255,204,41,.14);
+  --accent-line:rgba(255,204,41,.34);
   --bg:#08090a;
   --panel:rgba(255,255,255,.028);
   --panel-2:rgba(255,255,255,.05);
@@ -40,9 +40,9 @@ a{color:inherit; text-decoration:none}
 /* ── ambient light ─────────────────────────────────────────── */
 .aurora{position:fixed; inset:0; pointer-events:none; z-index:0; overflow:hidden}
 .aurora i{position:absolute; border-radius:50%; filter:blur(120px); opacity:.24; display:block}
-.a1{width:760px; height:760px; top:-320px; left:50%; margin-left:-380px; background:var(--neon); opacity:.17}
-.a2{width:520px; height:520px; top:36%; left:-180px; background:var(--neon-2); opacity:.10}
-.a3{width:560px; height:560px; bottom:-200px; right:-140px; background:var(--neon); opacity:.09}
+.a1{width:760px; height:760px; top:-320px; left:50%; margin-left:-380px; background:var(--accent); opacity:.17}
+.a2{width:520px; height:520px; top:36%; left:-180px; background:var(--accent-2); opacity:.10}
+.a3{width:560px; height:560px; bottom:-200px; right:-140px; background:var(--accent); opacity:.09}
 .grain{position:fixed; inset:0; z-index:1; pointer-events:none; opacity:.035; mix-blend-mode:overlay;
   background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
 main,header,footer{position:relative; z-index:2}
@@ -58,29 +58,29 @@ header.stuck{backdrop-filter:blur(20px) saturate(160%); background:rgba(8,9,10,.
 .bar nav{margin-left:auto; display:flex; gap:4px}
 .bar nav a{font-size:13.5px; color:var(--mute); padding:7px 12px; border-radius:9px; transition:.18s}
 .bar nav a:hover{color:var(--ink); background:var(--panel-2)}
-.bar nav a.on{color:var(--neon)}
-.cta{border:1px solid var(--neon-line); color:var(--neon); padding:8px 16px; border-radius:999px;
+.bar nav a.on{color:var(--accent)}
+.cta{border:1px solid var(--accent-line); color:var(--accent); padding:8px 16px; border-radius:999px;
   font-size:13.5px; font-weight:560; transition:.2s; white-space:nowrap}
-.cta:hover{background:var(--neon-dim); box-shadow:0 0 24px -6px var(--neon-line)}
+.cta:hover{background:var(--accent-soft); box-shadow:0 0 24px -6px var(--accent-line)}
 
 /* ── type ──────────────────────────────────────────────────── */
 h1{font-size:clamp(40px,7.2vw,76px); line-height:1.01; letter-spacing:-.042em; margin:0 0 20px; font-weight:660}
 h2{font-size:clamp(26px,4vw,40px); line-height:1.1; letter-spacing:-.032em; margin:0 0 14px; font-weight:640}
-.grad{background:linear-gradient(96deg,var(--neon) 10%,var(--neon-2) 90%);
+.grad{background:linear-gradient(96deg,var(--accent) 10%,var(--accent-2) 90%);
   -webkit-background-clip:text; background-clip:text; color:transparent}
 .lede{max-width:620px; color:var(--mute); font-size:clamp(16px,1.6vw,18.5px); margin:0 auto}
 .sub{color:var(--mute); margin:0 0 40px; max-width:660px; font-size:16px}
-.eyebrow{display:inline-flex; align-items:center; gap:8px; color:var(--neon); font-size:11.5px;
+.eyebrow{display:inline-flex; align-items:center; gap:8px; color:var(--accent); font-size:11.5px;
   font-weight:650; letter-spacing:.16em; text-transform:uppercase; margin:0 0 14px}
-.eyebrow::before{content:""; width:18px; height:1px; background:var(--neon); opacity:.6}
+.eyebrow::before{content:""; width:18px; height:1px; background:var(--accent); opacity:.6}
 
 /* ── hero ──────────────────────────────────────────────────── */
 .hero{padding:96px 0 40px; text-align:center}
 .pill{display:inline-flex; align-items:center; gap:9px; border:1px solid var(--line);
   background:var(--panel); border-radius:999px; padding:6px 14px 6px 8px; font-size:12.5px;
   color:var(--mute); margin-bottom:30px}
-.pill b{display:inline-flex; align-items:center; gap:5px; color:var(--neon); font-weight:600}
-.dot{width:6px; height:6px; border-radius:50%; background:var(--neon); box-shadow:0 0 10px var(--neon);
+.pill b{display:inline-flex; align-items:center; gap:5px; color:var(--accent); font-weight:600}
+.dot{width:6px; height:6px; border-radius:50%; background:var(--accent); box-shadow:0 0 10px var(--accent);
   animation:pulse 2.4s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
 .keys{display:inline-flex; gap:9px; align-items:center; margin-top:28px; flex-wrap:wrap; justify-content:center;
@@ -92,32 +92,32 @@ kbd{font:600 12.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--i
 
 .actions{display:flex; gap:12px; justify-content:center; flex-wrap:wrap; margin-top:34px}
 .btn{display:inline-flex; flex-direction:column; align-items:center; gap:2px;
-  background:var(--neon); color:#062010; border:1px solid var(--neon);
+  background:var(--accent); color:#33260a; border:1px solid var(--accent);
   padding:11px 26px; border-radius:12px; font-size:15px; font-weight:640;
-  transition:.2s; box-shadow:0 0 34px -8px var(--neon)}
-.btn:hover{transform:translateY(-2px); box-shadow:0 0 46px -6px var(--neon)}
+  transition:.2s; box-shadow:0 0 34px -8px var(--accent)}
+.btn:hover{transform:translateY(-2px); box-shadow:0 0 46px -6px var(--accent)}
 .btn span{font-size:11px; font-weight:500; opacity:.62; letter-spacing:.02em}
 .btn.ghost{background:transparent; color:var(--ink); border-color:var(--line);
   box-shadow:none; justify-content:center; padding:11px 22px}
-.btn.ghost:hover{border-color:var(--neon-line); color:var(--neon)}
+.btn.ghost:hover{border-color:var(--accent-line); color:var(--accent)}
 
 /* ── live wheel ────────────────────────────────────────────── */
 .stage{margin:56px auto 0; width:min(520px,86vw); aspect-ratio:1; position:relative}
 .stage::before{content:""; position:absolute; inset:8%; border-radius:50%;
-  background:radial-gradient(circle,var(--neon) 0%,transparent 68%); opacity:.16; filter:blur(50px)}
+  background:radial-gradient(circle,var(--accent) 0%,transparent 68%); opacity:.16; filter:blur(50px)}
 #wheel{width:100%; height:100%; display:block; position:relative; cursor:pointer}
-#wheel .petal{fill:rgba(255,255,255,.05); stroke:rgba(255,255,255,.05); stroke-width:13;
+#wheel .petal{fill:rgba(255,255,255,.92); stroke:rgba(255,255,255,.92); stroke-width:13;
   stroke-linejoin:round; transition:fill .25s, stroke .25s, filter .25s}
-#wheel .petal.on{fill:var(--neon); stroke:var(--neon);
-  filter:drop-shadow(0 0 16px rgba(77,255,139,.6))}
-#wheel .plabel{fill:#cfd8d3; font:600 13px -apple-system,BlinkMacSystemFont,sans-serif;
+#wheel .petal.on{fill:var(--accent); stroke:var(--accent);
+  filter:drop-shadow(0 0 16px rgba(255,204,41,.55))}
+#wheel .plabel{fill:#1a1c1b; font:600 13px -apple-system,BlinkMacSystemFont,sans-serif;
   text-anchor:middle; pointer-events:none; letter-spacing:.02em; transition:fill .22s}
-#wheel .petal.on + .plabel{fill:#062010}
+#wheel .petal.on + .plabel{fill:#33260a}
 #wheel .disc{fill:rgba(255,255,255,.022); stroke:rgba(255,255,255,.07); stroke-width:1}
-#wheel .hub{fill:#0c0e0d; stroke:rgba(255,255,255,.10); stroke-width:1}
-#wheel .src{fill:var(--ink); font:600 13px -apple-system,sans-serif; text-anchor:middle}
-#wheel .tgtbox{fill:var(--neon); filter:drop-shadow(0 0 10px rgba(77,255,139,.5))}
-#wheel .tgt{fill:#062010; font:700 12px -apple-system,sans-serif; text-anchor:middle}
+#wheel .hub{fill:var(--accent); stroke:rgba(0,0,0,.16); stroke-width:1}
+#wheel .src{fill:#33260a; font:600 13px -apple-system,sans-serif; text-anchor:middle}
+#wheel .tgtbox{fill:#33260a; filter:drop-shadow(0 0 10px rgba(255,204,41,.5))}
+#wheel .tgt{fill:var(--accent); font:700 12px -apple-system,sans-serif; text-anchor:middle}
 .caption{margin-top:22px; color:var(--faint); font-size:13px}
 .caption b{color:var(--mute); font-weight:500}
 
@@ -141,11 +141,11 @@ section{padding:110px 0}
 .bento{display:grid; grid-template-columns:repeat(6,1fr); gap:16px}
 .card{background:var(--panel); border:1px solid var(--line); border-radius:var(--r); padding:26px;
   position:relative; overflow:hidden; transition:border-color .25s, background .25s, transform .25s}
-.card:hover{border-color:var(--neon-line); background:var(--panel-2); transform:translateY(-3px)}
+.card:hover{border-color:var(--accent-line); background:var(--panel-2); transform:translateY(-3px)}
 .card h3{margin:0 0 8px; font-size:17.5px; font-weight:620; letter-spacing:-.015em}
 .card p{margin:0; color:var(--mute); font-size:14.5px; line-height:1.62}
 .card .ico{width:38px; height:38px; border-radius:11px; display:grid; place-items:center; margin-bottom:16px;
-  background:var(--neon-dim); border:1px solid var(--neon-line); color:var(--neon); font-size:17px}
+  background:var(--accent-soft); border:1px solid var(--accent-line); color:var(--accent); font-size:17px}
 .c6{grid-column:span 6} .c4{grid-column:span 4} .c3{grid-column:span 3} .c2{grid-column:span 2}
 .card img{width:100%; border-radius:12px; margin-top:20px; display:block}
 .big{font-size:clamp(30px,4.4vw,44px); font-weight:660; letter-spacing:-.03em; line-height:1; margin:0 0 6px}
@@ -168,19 +168,19 @@ td code,.mono{font:12.8px/1.75 ui-monospace,SFMono-Regular,Menlo,monospace; colo
 .chips{display:flex; flex-wrap:wrap; gap:9px; margin-top:22px}
 .chip{border:1px solid var(--line); background:var(--panel); border-radius:999px; padding:7px 14px;
   font-size:13px; color:var(--mute); transition:.2s}
-.chip:hover{border-color:var(--neon-line); color:var(--ink)}
-.chip.hot{border-color:var(--neon-line); color:var(--neon)}
+.chip:hover{border-color:var(--accent-line); color:var(--ink)}
+.chip.hot{border-color:var(--accent-line); color:var(--accent)}
 
 /* code */
 pre{background:rgba(0,0,0,.42); border:1px solid var(--line); border-radius:var(--r);
   padding:22px 24px; overflow-x:auto; margin:0;
   font:13px/1.95 ui-monospace,SFMono-Regular,Menlo,monospace; color:#dfe6e1}
-pre .c{color:var(--faint)} pre .k{color:var(--neon)} pre .s{color:var(--neon-2)}
+pre .c{color:var(--faint)} pre .k{color:var(--accent)} pre .s{color:var(--accent-2)}
 .codehead{display:flex; gap:7px; padding:0 0 14px}
 .codehead i{width:11px; height:11px; border-radius:50%; background:rgba(255,255,255,.13); display:block}
 
 .note{display:flex; gap:15px; align-items:flex-start; background:var(--panel);
-  border:1px solid var(--line); border-left:2px solid var(--neon);
+  border:1px solid var(--line); border-left:2px solid var(--accent);
   border-radius:12px; padding:18px 22px; color:var(--mute); font-size:14.5px}
 .note b{color:var(--ink); font-weight:600}
 
@@ -192,7 +192,7 @@ footer{border-top:1px solid var(--line); padding:48px 0 60px; color:var(--faint)
 .foot-links a:hover{color:var(--ink); text-decoration:none}
 .made{margin:22px 0 0; color:var(--faint)}
 .made a{color:var(--mute); font-weight:560}
-.made a:hover{color:var(--neon); text-decoration:none}
+.made a:hover{color:var(--accent); text-decoration:none}
 /* Deliberately quiet — present for anyone who looks, never a pitch. */
 .coffee{margin:14px 0 0}
 .coffee a{display:inline-flex; align-items:center; gap:5px;
@@ -220,12 +220,12 @@ footer{border-top:1px solid var(--line); padding:48px 0 60px; color:var(--faint)
 
 <header id="hd">
   <div class="wrap bar">
-    <a class="brand" href="#"><img src="img/icon.png" alt=""> Kuori</a>
+    <a class="brand" href="#"><img src="img/icon.png" alt=""> Daisy</a>
     <nav>
       <a href="#how">How</a><a href="#formats">Formats</a><a href="#tools">Tools</a>
       <a href="#flow">Recipes</a><a href="#cli">CLI</a><a href="#install">Install</a>
     </nav>
-    <a class="cta" href="https://github.com/ishanmalu/kuori">GitHub ↗</a>
+    <a class="cta" href="https://github.com/ishanmalu/daisy">GitHub ↗</a>
   </div>
 </header>
 
@@ -234,20 +234,20 @@ footer{border-top:1px solid var(--line); padding:48px 0 60px; color:var(--faint)
 <div class="wrap hero">
   <span class="pill"><b><i class="dot"></i> v0.4.0</b> · macOS 14+ · Universal</span>
   <h1>The converter that<br><span class="grad">comes to you.</span></h1>
-  <p class="lede">Hold Shift, drag a file, drop it on a petal. Kuori puts a wheel of every
+  <p class="lede">Hold Shift, drag a file, drop it on a petal. Daisy puts a wheel of every
     format that file can become right where you are — and converts it on your Mac,
     without uploading a thing.</p>
   <div class="actions">
-    <a class="btn" href="https://github.com/ishanmalu/kuori/releases/latest">Download for Mac
+    <a class="btn" href="https://github.com/ishanmalu/daisy/releases/latest">Download for Mac
       <span>0.4.0 · Universal · 9.3 MB</span></a>
-    <a class="btn ghost" href="https://github.com/ishanmalu/kuori">View source</a>
+    <a class="btn ghost" href="https://github.com/ishanmalu/daisy">View source</a>
   </div>
   <div class="keys">
     <kbd>⇧</kbd> drag a file &nbsp;·&nbsp; <kbd>⌥</kbd><kbd>⇧</kbd><kbd>V</kbd> anywhere
   </div>
 
   <div class="stage">
-    <svg id="wheel" viewBox="0 0 560 560" aria-label="Interactive preview of the Kuori conversion wheel"></svg>
+    <svg id="wheel" viewBox="0 0 560 560" aria-label="Interactive preview of the Daisy conversion wheel"></svg>
   </div>
   <p class="caption">Live preview — <b>hover a petal</b></p>
 </div>
@@ -317,9 +317,9 @@ footer{border-top:1px solid var(--line); padding:48px 0 60px; color:var(--faint)
       </table>
     </div>
     <div class="note rv" style="margin-top:22px">
-      <span style="color:var(--neon)">▲</span>
+      <span style="color:var(--accent)">▲</span>
       <div>RAR extraction works. <b>Creating</b> RAR archives doesn’t, and won’t — there is no
-        licensable RAR encoder. Kuori offers ZIP or 7z rather than pretending otherwise.</div>
+        licensable RAR encoder. Daisy offers ZIP or 7z rather than pretending otherwise.</div>
     </div>
   </div>
 </section>
@@ -346,7 +346,7 @@ footer{border-top:1px solid var(--line); padding:48px 0 60px; color:var(--faint)
       <div class="card c3 rv"><img src="img/wheel-tools.png" alt="The wheel in Tools mode"></div>
       <div class="card c3 rv"><div class="ico">⌕</div>
         <h3>OCR → searchable PDF</h3>
-        <p>Vision reads the page and Kuori writes a real invisible text layer, so the PDF is
+        <p>Vision reads the page and Daisy writes a real invisible text layer, so the PDF is
           selectable, searchable and Spotlight-indexed — not a picture of words.</p></div>
       <div class="card c3 rv"><div class="ico">✂</div>
         <h3>Remove background</h3>
@@ -381,18 +381,18 @@ footer{border-top:1px solid var(--line); padding:48px 0 60px; color:var(--faint)
       <div>
         <p class="eyebrow rv">Command line</p>
         <h2 class="rv">The same engine, scriptable.</h2>
-        <p class="sub rv">Everything the wheel does, <code class="mono">kuori</code> does —
+        <p class="sub rv">Everything the wheel does, <code class="mono">daisy</code> does —
           same capability graph, same bundled engines, no separate install.</p>
       </div>
       <div class="rv">
         <div class="codehead"><i></i><i></i><i></i></div>
-<pre><span class="k">kuori</span> convert photo.png <span class="s">--to</span> webp <span class="s">--quality</span> 80
-<span class="k">kuori</span> convert *.jpg <span class="s">--to</span> pdf <span class="s">--out</span> ~/Desktop
-<span class="k">kuori</span> convert shot.png <span class="s">--preset</span> web-jpg
-<span class="k">kuori</span> tool ocr scan.png       <span class="c"># → searchable</span>
-<span class="k">kuori</span> recipe square-jpg *.png
-<span class="k">kuori</span> watch add ~/Incoming <span class="s">--to</span> webp
-<span class="k">kuori</span> formats                <span class="c"># the whole graph</span></pre>
+<pre><span class="k">daisy</span> convert photo.png <span class="s">--to</span> webp <span class="s">--quality</span> 80
+<span class="k">daisy</span> convert *.jpg <span class="s">--to</span> pdf <span class="s">--out</span> ~/Desktop
+<span class="k">daisy</span> convert shot.png <span class="s">--preset</span> web-jpg
+<span class="k">daisy</span> tool ocr scan.png       <span class="c"># → searchable</span>
+<span class="k">daisy</span> recipe square-jpg *.png
+<span class="k">daisy</span> watch add ~/Incoming <span class="s">--to</span> webp
+<span class="k">daisy</span> formats                <span class="c"># the whole graph</span></pre>
       </div>
     </div>
   </div>
@@ -405,7 +405,7 @@ footer{border-top:1px solid var(--line); padding:48px 0 60px; color:var(--faint)
         <p class="eyebrow">Local only</p>
         <h2 style="font-size:clamp(24px,3.2vw,34px)">Nothing is uploaded. Ever.</h2>
         <p>Dragging a passport scan, a contract, or a client’s raw footage into a free web
-          converter means handing it to someone else’s server. Kuori has no network code in
+          converter means handing it to someone else’s server. Daisy has no network code in
           the conversion path at all — the engines run as child processes on your Mac and
           the bytes never leave it.</p>
         <div class="chips">
@@ -429,24 +429,24 @@ footer{border-top:1px solid var(--line); padding:48px 0 60px; color:var(--faint)
       for any noncommercial use, source and all — Swift and AppKit, SwiftPM, no Xcode
       project, safety checks inside the binary.</p>
     <div class="actions rv" style="justify-content:flex-start; margin:0 0 30px">
-      <a class="btn" href="https://github.com/ishanmalu/kuori/releases/latest">Download 0.4.0
+      <a class="btn" href="https://github.com/ishanmalu/daisy/releases/latest">Download 0.4.0
         <span>macOS 14+ · Intel &amp; Apple Silicon</span></a>
     </div>
     <div class="rv">
       <div class="codehead"><i></i><i></i><i></i></div>
-<pre>git clone https://github.com/ishanmalu/kuori
-cd kuori
-swift run Kuori <span class="s">--selftest</span>        <span class="c"># 54 graph + logic checks</span>
+<pre>git clone https://github.com/ishanmalu/daisy
+cd daisy
+swift run Daisy <span class="s">--selftest</span>        <span class="c"># 54 graph + logic checks</span>
 Scripts/bundle-engines.sh         <span class="c"># vendor cwebp, qpdf, resvg, …</span>
-Scripts/build-app.sh 0.4.0        <span class="c"># → dist/Kuori.app</span></pre>
+Scripts/build-app.sh 0.4.0        <span class="c"># → dist/Daisy.app</span></pre>
     </div>
     <div class="note rv" style="margin-top:24px">
-      <span style="color:var(--neon)">◆</span>
-      <div>Universal, macOS 14 or later. The download is small because most of Kuori is
+      <span style="color:var(--accent)">◆</span>
+      <div>Universal, macOS 14 or later. The download is small because most of Daisy is
         native — ImageIO, PDFKit and Vision do the images, PDFs, OCR and background
         removal, and only five permissively-licensed helpers ride along. Video, audio and
         documents need the GPL tools, which aren't redistributed here: run
-        <code class="mono">brew install ffmpeg pandoc potrace</code> and Kuori finds them.
+        <code class="mono">brew install ffmpeg pandoc potrace</code> and Daisy finds them.
         Same on Intel, where Homebrew no longer bottles every engine.</div>
     </div>
   </div>
@@ -457,10 +457,10 @@ Scripts/build-app.sh 0.4.0        <span class="c"># → dist/Kuori.app</span></p
 <footer>
   <div class="wrap">
     <div class="foot-links">
-      <a href="https://github.com/ishanmalu/kuori">GitHub</a>
-      <a href="https://github.com/ishanmalu/kuori/releases">Releases</a>
-      <a href="https://github.com/ishanmalu/kuori/issues">Report an issue</a>
-      <a href="https://github.com/ishanmalu/kuori/blob/main/LICENSE">Noncommercial licence</a>
+      <a href="https://github.com/ishanmalu/daisy">GitHub</a>
+      <a href="https://github.com/ishanmalu/daisy/releases">Releases</a>
+      <a href="https://github.com/ishanmalu/daisy/issues">Report an issue</a>
+      <a href="https://github.com/ishanmalu/daisy/blob/main/LICENSE">Noncommercial licence</a>
     </div>
     <p class="made">
       By <a href="https://www.linkedin.com/in/ishanmalu/" target="_blank" rel="noopener">Ishan Malu</a>
@@ -473,7 +473,7 @@ Scripts/build-app.sh 0.4.0        <span class="c"># → dist/Kuori.app</span></p
         </svg>Buy me a coffee
       </a>
     </p>
-    <p class="peel">Kuori — Finnish for <em>peel</em>. You drop a file in and the format comes away.</p>
+    <p class="peel">Daisy — white petals, yellow centre. Your file sits in the middle; every format it can become fans out around it.</p>
   </div>
 </footer>
 

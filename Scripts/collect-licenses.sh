@@ -36,9 +36,9 @@ all=$(brew deps --union --installed "${roots[@]}" 2>/dev/null; printf '%s\n' "${
 all=$(printf '%s\n' $all | sort -u)
 
 {
-  echo "# Third-party engines bundled with Kuori"
+  echo "# Third-party engines bundled with Daisy"
   echo
-  echo "Kuori runs these as separate programs. They keep their own licences,"
+  echo "Daisy runs these as separate programs. They keep their own licences,"
   echo "reproduced in this directory. Each was taken unmodified from the Homebrew"
   echo "bottle named below; \`brew fetch --build-from-source <formula>\` retrieves"
   echo "the corresponding source."
@@ -72,9 +72,9 @@ done
   echo "## Relinking"
   echo
   echo "The LGPL components are shipped as separate dylibs in"
-  echo "\`Kuori.app/Contents/Resources/engine/libs/\`, loaded through"
+  echo "\`Daisy.app/Contents/Resources/engine/libs/\`, loaded through"
   echo "\`@loader_path\`. Replacing one with your own build is enough to relink —"
-  echo "no part of Kuori is statically linked against them."
+  echo "no part of Daisy is statically linked against them."
 } >> "$OUT/NOTICE.md"
 
 echo "  $OUT: $count component licences + NOTICE.md"

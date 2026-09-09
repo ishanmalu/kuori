@@ -66,7 +66,7 @@ struct DocConverter: Converter {
     // MARK: engines
 
     private func tmp(_ ext: String) -> URL {
-        FileManager.default.temporaryDirectory.appendingPathComponent("kuori-\(UUID().uuidString).\(ext)")
+        FileManager.default.temporaryDirectory.appendingPathComponent("daisy-\(UUID().uuidString).\(ext)")
     }
 
     private func pandoc(_ input: URL, to output: URL) throws {
@@ -80,7 +80,7 @@ struct DocConverter: Converter {
     /// soffice writes `<inputStem>.<toExt>` into its --outdir; we move it to `finalOutput`.
     private func soffice(_ input: URL, toExt: String, filter: String?, finalOutput: URL) throws {
         guard let bin = EngineLocator.libreOffice() else { throw ConvertError.engineMissing(.libreoffice) }
-        let outDir = FileManager.default.temporaryDirectory.appendingPathComponent("kuori-lo-\(UUID().uuidString)")
+        let outDir = FileManager.default.temporaryDirectory.appendingPathComponent("daisy-lo-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: outDir, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: outDir) }
 

@@ -1,18 +1,19 @@
-# Kuori — File Converter for Mac
+# Daisy — File Converter for Mac
 
 **The converter that comes to you.** Hold Shift, drag a file, drop it on a petal.
-Kuori puts a wheel of every format that file can become right where you are, and
+Daisy puts a wheel of every format that file can become right where you are, and
 converts it on your Mac — nothing is uploaded, ever.
 
-*Kuori* is Finnish for **peel**: you drop a file in and the format comes away.
+Named for what it looks like: white petals around a yellow centre. The file
+sits in the middle, every format it can become fans out around it.
 
-[**Download 0.3.1**](https://github.com/ishanmalu/kuori/releases/latest) ·
-[Site](https://ishanmalu.github.io/kuori/) · macOS 14+ · Universal · Free for noncommercial use
+[**Download 0.3.1**](https://github.com/ishanmalu/daisy/releases/latest) ·
+[Site](https://ishanmalu.github.io/daisy/) · macOS 14+ · Universal · Free for noncommercial use
 
-A menu-bar wheel and a `kuori` CLI over one conversion engine, with nine
+A menu-bar wheel and a `daisy` CLI over one conversion engine, with nine
 converters bundled inside the app so it runs on a machine with nothing
 installed. Swift + AppKit, SwiftPM, no Xcode; checks ship in the binary as
-`Kuori --selftest`.
+`Daisy --selftest`.
 
 ## What it does
 
@@ -38,7 +39,7 @@ Merge PDF · Split PDF.
 
 **Watch folders** — anything dropped into a watched folder is converted (by
 format or by recipe) and the original moved to `_processed/`. Runs in-process;
-add them in Settings or `kuori watch add`.
+add them in Settings or `daisy watch add`.
 
 **RAR creation is not supported** — no licensable RAR encoder. Use ZIP or 7z.
 
@@ -55,38 +56,38 @@ petals. Monochrome, keyboard-driven:
 hotkey. If files are on the clipboard it loads them; otherwise drag one from
 Finder straight onto the ring. A `DragMonitor` also tries to summon it mid
 Shift-drag from Finder, where the OS allows a global mouse monitor
-(`Kuori --drag-probe` tells you). It also opens from the menu bar or the
-"Convert with Kuori…" Finder Service. Runs happen on a background queue with a
+(`Daisy --drag-probe` tells you). It also opens from the menu bar or the
+"Convert with Daisy…" Finder Service. Runs happen on a background queue with a
 progress readout and auto-dismiss on success.
 
 ## Site
 
-[ishanmalu.github.io/kuori](https://ishanmalu.github.io/kuori/) — served from
+[ishanmalu.github.io/daisy](https://ishanmalu.github.io/daisy/) — served from
 `docs/`. The hero wheel is live SVG built from the same geometry the app draws.
 
 ## Build from source
 
 ```sh
-swift run Kuori --selftest             # 50 graph + logic checks
-Scripts/build-app.sh 0.3.0             # -> dist/Kuori.app  (add --universal for arm64+x86_64)
-Scripts/make-dmg.sh 0.3.0             # -> dist/Kuori-0.3.0.dmg
-open dist/Kuori.app                    # menu-bar icon -> Open Wheel / Settings
+swift run Daisy --selftest             # 50 graph + logic checks
+Scripts/build-app.sh 0.3.0             # -> dist/Daisy.app  (add --universal for arm64+x86_64)
+Scripts/make-dmg.sh 0.3.0             # -> dist/Daisy-0.3.0.dmg
+open dist/Daisy.app                    # menu-bar icon -> Open Wheel / Settings
 ```
 
 ## CLI
 
 ```sh
-kuori convert photo.png --to webp --quality 80
-kuori convert *.jpg --to pdf --out ~/Desktop
-kuori convert in.png out.avif                     # target inferred from the name
-kuori convert shot.png --preset web-jpg           # saved preset
-kuori tool resize clip.mov --preset "½"
-kuori tool ocr scan.png                           # -> scan-ocr.pdf, searchable
-kuori tool removeBackground portrait.jpg          # -> portrait-nobg.png
-kuori merge a.pdf b.pdf ; kuori split book.pdf
-kuori recipe square-jpg *.png
-kuori watch add ~/Dropbox/Incoming --to webp
-kuori presets ; kuori recipes ; kuori formats ; kuori info movie.mkv
+daisy convert photo.png --to webp --quality 80
+daisy convert *.jpg --to pdf --out ~/Desktop
+daisy convert in.png out.avif                     # target inferred from the name
+daisy convert shot.png --preset web-jpg           # saved preset
+daisy tool resize clip.mov --preset "½"
+daisy tool ocr scan.png                           # -> scan-ocr.pdf, searchable
+daisy tool removeBackground portrait.jpg          # -> portrait-nobg.png
+daisy merge a.pdf b.pdf ; daisy split book.pdf
+daisy recipe square-jpg *.png
+daisy watch add ~/Dropbox/Incoming --to webp
+daisy presets ; daisy recipes ; daisy formats ; daisy info movie.mkv
 ```
 
 ## Intel Macs
@@ -137,7 +138,7 @@ The bundled set is deliberately GPL-free, so the DMG carries no source-offer
 obligation: cwebp (BSD-3), qpdf (Apache-2.0), resvg (MPL-2.0), 7zz and unar
 (LGPL, shipped as replaceable dylibs). ffmpeg, pandoc and potrace are GPL and
 libvips's bottle hard-links libfftw3 and libimagequant, so none of them are
-bundled — install them with Homebrew and Kuori picks them up off `PATH`.
+bundled — install them with Homebrew and Daisy picks them up off `PATH`.
 
 WebP is the one raster format macOS decodes but won't encode, so cwebp stands
 in; everything else runs on ImageIO, PDFKit and Vision. `Scripts/collect-dylibs.py`
@@ -145,7 +146,7 @@ is a small deterministic stand-in for `dylibbundler` (walks `otool -L`, copies,
 `install_name_tool`s, strips package-manager rpaths).
 
 **LibreOffice** is bring-your-own: install it under `/Applications` (or drop a
-copy in `~/Library/Application Support/Kuori/engine/`) and Office↔PDF fidelity
+copy in `~/Library/Application Support/Daisy/engine/`) and Office↔PDF fidelity
 conversions light up. Never auto-downloaded.
 
 Engine licenses live in `LICENSES/`.

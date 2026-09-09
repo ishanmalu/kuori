@@ -17,7 +17,7 @@ final class WatchFolders {
     private let lock = NSLock()
     private var _rules: [WatchRule] = []
     private var stream: FSEventStreamRef?
-    private let workQueue = DispatchQueue(label: "kuori.watch", qos: .utility)
+    private let workQueue = DispatchQueue(label: "daisy.watch", qos: .utility)
     private var inFlight = Set<String>()
 
     /// A snapshot; the FSEvents callback and the Settings UI both touch this.
@@ -123,7 +123,7 @@ final class WatchFolders {
             try? FileManager.default.removeItem(at: processed)
             try? FileManager.default.moveItem(at: file, to: processed)
         } catch {
-            NSLog("Kuori watch: \(file.lastPathComponent) — \(error.localizedDescription)")
+            NSLog("Daisy watch: \(file.lastPathComponent) — \(error.localizedDescription)")
         }
     }
 }

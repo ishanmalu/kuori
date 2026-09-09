@@ -3,14 +3,14 @@ import PackageDescription
 
 // No .xcodeproj: the machine has Command Line Tools only. Universal builds are
 // two single-arch `swift build`s stitched with `lipo` (see Scripts/build-app.sh).
-// Safety checks ship as `Kuori --selftest` because XCTest isn't in the CLT SDK.
+// Safety checks ship as `Daisy --selftest` because XCTest isn't in the CLT SDK.
 let package = Package(
-    name: "Kuori",
+    name: "Daisy",
     platforms: [.macOS(.v14)],
     targets: [
         .executableTarget(
-            name: "Kuori",
-            path: "Sources/Kuori",
+            name: "Daisy",
+            path: "Sources/Daisy",
             swiftSettings: [.swiftLanguageMode(.v5)],
             linkerSettings: [
                 .linkedFramework("AppKit"),

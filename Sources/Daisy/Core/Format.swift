@@ -1,6 +1,6 @@
 import Foundation
 
-/// The file kinds Kuori knows how to move between. Everything the UI and CLI
+/// The file kinds Daisy knows how to move between. Everything the UI and CLI
 /// offer is derived from this table plus the capability graph in `Engine.swift`.
 enum Category: String, CaseIterable {
     case image, video, audio, document, archive

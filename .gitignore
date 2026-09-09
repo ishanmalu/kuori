@@ -2,6 +2,6 @@
 dist/
 *.dmg
 .DS_Store
-Resources/Kuori.iconset/
-Resources/Kuori.icns
+Resources/Daisy.iconset/
+Resources/Daisy.icns
 Resources/engine/

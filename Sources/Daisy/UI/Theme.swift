@@ -1,14 +1,22 @@
 import AppKit
 
 /// Perch's visual language — translucent surfaces, hairline strokes, one accent
-/// threaded through every active state — with that accent set to neon.
+/// threaded through every active state — wearing a daisy's colours: white
+/// petals around a yellow centre.
 enum Theme {
     static let corner: CGFloat = 13
     static let tileCorner: CGFloat = 8
     static let pad: CGFloat = 22
 
-    /// The single accent. Low alpha for fills, higher for edges, full for text and glow.
-    static let neon = NSColor(srgbRed: 0.28, green: 1.0, blue: 0.52, alpha: 1)
+    /// The accent: the flower's centre. Warm enough to glow against both a white
+    /// petal and a dark desktop, and dark enough that near-black text sits on it
+    /// legibly — a paler lemon fails that second test.
+    static let accent = NSColor(srgbRed: 1.0, green: 0.80, blue: 0.16, alpha: 1)
+    /// A half-step deeper, for the shaded side of the centre.
+    static let accentDeep = NSColor(srgbRed: 0.98, green: 0.68, blue: 0.09, alpha: 1)
+
+    /// Text and icons that sit on top of the accent.
+    static let onAccent = NSColor(srgbRed: 0.20, green: 0.13, blue: 0.0, alpha: 1)
 
     static var paper: NSColor {
         NSColor(name: nil) { $0.isDark ? NSColor(calibratedWhite: 0.10, alpha: 1) : .white }
@@ -42,16 +50,22 @@ enum Theme {
         NSColor(name: nil) { $0.isDark ? NSColor(calibratedWhite: 0.0, alpha: 0.38)
                                        : NSColor(calibratedWhite: 0.35, alpha: 0.22) }
     }
-    /// Resting petal fill — glass, not paint.
+    /// Resting petal — white in both appearances, because that is the whole
+    /// point of the name. It has to be nearly opaque: a translucent white over a
+    /// dark desktop turns grey, and grey petals are not a daisy. The glass shows
+    /// in the gaps between them and around the rim instead.
     static var petalRest: NSColor {
-        NSColor(name: nil) { $0.isDark ? NSColor(calibratedWhite: 1.0, alpha: 0.09)
-                                       : NSColor(calibratedWhite: 1.0, alpha: 0.62) }
+        NSColor(name: nil) { $0.isDark ? NSColor(calibratedWhite: 1.0, alpha: 0.90)
+                                       : NSColor(calibratedWhite: 1.0, alpha: 0.86) }
     }
-    /// Hub fill, a touch denser than the disc so the thumbnail has a seat.
-    static var hubFill: NSColor {
-        NSColor(name: nil) { $0.isDark ? NSColor(calibratedWhite: 0.13, alpha: 0.78)
-                                       : NSColor(calibratedWhite: 1.0, alpha: 0.72) }
+    /// Petal text. On a white petal that has to be ink, in either appearance.
+    static var onPetal: NSColor {
+        NSColor(name: nil) { $0.isDark ? NSColor(calibratedWhite: 0.10, alpha: 1)
+                                       : NSColor(calibratedWhite: 0.07, alpha: 1) }
     }
+    /// The centre of the flower. A thumbnail covers it, so this is what shows
+    /// when there isn't one.
+    static var hubFill: NSColor { accent }
 }
 
 extension NSAppearance {

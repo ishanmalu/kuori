@@ -12,7 +12,7 @@ enum EngineLocator {
 
     static var supportEngineDir: URL {
         FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Application Support/Kuori/engine", isDirectory: true)
+            .appendingPathComponent("Library/Application Support/Daisy/engine", isDirectory: true)
     }
 
     /// LibreOffice is bring-your-own — a normal /Applications install, or a copy

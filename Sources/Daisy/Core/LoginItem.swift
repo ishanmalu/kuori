@@ -12,7 +12,7 @@ enum LoginItem {
             if isEnabled { try SMAppService.mainApp.unregister() }
             else { try SMAppService.mainApp.register() }
         } catch {
-            NSLog("Kuori login item: \(error.localizedDescription)")
+            NSLog("Daisy login item: \(error.localizedDescription)")
         }
         return isEnabled
     }

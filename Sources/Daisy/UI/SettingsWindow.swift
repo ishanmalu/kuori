@@ -6,12 +6,12 @@ final class SettingsWindow: NSWindowController, NSTableViewDataSource, NSTableVi
     static let shared = SettingsWindow()
 
     private let table = NSTableView()
-    private let loginCheck = NSButton(checkboxWithTitle: "Open Kuori at login", target: nil, action: nil)
+    private let loginCheck = NSButton(checkboxWithTitle: "Open Daisy at login", target: nil, action: nil)
 
     private convenience init() {
         let win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 460, height: 380),
                            styleMask: [.titled, .closable], backing: .buffered, defer: false)
-        win.title = "Kuori Settings"
+        win.title = "Daisy Settings"
         self.init(window: win)
         build()
     }

@@ -392,7 +392,7 @@ private final class WheelHUD: NSView {
         progress = 0
         needsDisplay = true
 
-        DispatchQueue(label: "kuori.run", qos: .userInitiated).async { [weak self] in
+        DispatchQueue(label: "daisy.run", qos: .userInitiated).async { [weak self] in
             let report: (Int) -> Void = { done in
                 DispatchQueue.main.async {
                     self?.progress = Double(done) / Double(max(1, count))
@@ -487,7 +487,7 @@ private final class WheelHUD: NSView {
             let dashed = NSBezierPath(ovalIn: discRect.insetBy(dx: 9, dy: 9))
             dashed.lineWidth = 1.5
             dashed.setLineDash([6, 6], count: 2, phase: 0)
-            Theme.neon.withAlphaComponent(hoveringEmpty ? 0.75 : 0.42).setStroke()
+            Theme.accent.withAlphaComponent(hoveringEmpty ? 0.75 : 0.42).setStroke()
             dashed.stroke()
             text("Drop files", at: CGPoint(x: center.x, y: center.y + 16), 14, .semibold, Theme.ink)
             text("or click to choose", at: CGPoint(x: center.x, y: center.y - 3),
@@ -557,8 +557,7 @@ private final class WheelHUD: NSView {
         text(message, at: CGPoint(x: box.midX, y: box.midY), 11, .medium, Theme.ink, maxWidth: width - 20)
     }
 
-    /// Dark text that stays readable on a bright neon fill, in either appearance.
-    private static let onNeon = NSColor(srgbRed: 0.04, green: 0.10, blue: 0.05, alpha: 1)
+
 
     private func drawPetal(_ i: Int) {
         let active = (hover ?? focus) == i
@@ -568,15 +567,15 @@ private final class WheelHUD: NSView {
         if active {
             NSGraphicsContext.saveGraphicsState()
             let glow = NSShadow()
-            glow.shadowColor = Theme.neon.withAlphaComponent(0.55)
+            glow.shadowColor = Theme.accent.withAlphaComponent(0.55)
             glow.shadowBlurRadius = 16
             glow.shadowOffset = .zero
             glow.set()
-            Theme.neon.setFill()
+            Theme.accent.setFill()
             petal.fill()
             NSGraphicsContext.restoreGraphicsState()
-            if running { Theme.neon.withAlphaComponent(0.35).setFill(); petal.fill() }
-            fg = Self.onNeon
+            if running { Theme.accent.withAlphaComponent(0.35).setFill(); petal.fill() }
+            fg = Theme.onAccent
         } else {
             Theme.petalRest.setFill()
             petal.fill()
@@ -585,7 +584,7 @@ private final class WheelHUD: NSView {
             Theme.specular.withAlphaComponent(Theme.specular.alphaComponent * 0.45).setStroke()
             petal.lineWidth = 1
             petal.stroke()
-            fg = Theme.ink
+            fg = Theme.onPetal
         }
 
         let item = items[i]
@@ -607,8 +606,11 @@ private final class WheelHUD: NSView {
     private func drawHub() {
         let box = NSRect(x: center.x - hubR, y: center.y - hubR, width: hubR * 2, height: hubR * 2)
         let hub = NSBezierPath(ovalIn: box)
-        Theme.hubFill.setFill()
-        hub.fill()
+
+        // The centre is the one saturated thing on the wheel. A vertical
+        // gradient rather than a flat fill so it reads as a rounded disc.
+        NSGradient(starting: Theme.accent, ending: Theme.accentDeep)?
+            .draw(in: hub, angle: -90)
 
         if let thumb {
             NSGraphicsContext.saveGraphicsState()
@@ -616,12 +618,13 @@ private final class WheelHUD: NSView {
             thumb.draw(in: box, from: .zero, operation: .sourceOver, fraction: 1)
             NSGraphicsContext.restoreGraphicsState()
         } else {
-            text(sourceLabel(), at: CGPoint(x: center.x, y: center.y + 4), 12, .semibold, Theme.ink)
+            text(sourceLabel(), at: CGPoint(x: center.x, y: center.y + 4), 12, .semibold, Theme.onAccent)
         }
         // Nothing else says which mode you're in, and the petals alone are ambiguous.
         if mode != .convert {
             let name = mode == .tools ? "TOOLS" : "RECIPES"
-            let colour = thumb == nil ? Theme.inkFaint : Theme.paper.withAlphaComponent(0.85)
+            let colour = thumb == nil ? Theme.onAccent.withAlphaComponent(0.62)
+                                      : Theme.paper.withAlphaComponent(0.85)
             text(name, at: CGPoint(x: center.x, y: center.y + hubR - 13), 8.5, .semibold,
                  colour, tracking: 1)
         }
@@ -644,14 +647,15 @@ private final class WheelHUD: NSView {
         let shape = NSBezierPath(roundedRect: r, xRadius: 10, yRadius: 10)
         NSGraphicsContext.saveGraphicsState()
         let glow = NSShadow()
-        glow.shadowColor = Theme.neon.withAlphaComponent(0.5)
+        glow.shadowColor = NSColor.black.withAlphaComponent(0.45)
         glow.shadowBlurRadius = 10
         glow.shadowOffset = .zero
         glow.set()
-        Theme.neon.setFill()
+        // The pill overlaps the yellow centre, so it can't also be yellow.
+        Theme.onAccent.setFill()
         shape.fill()
         NSGraphicsContext.restoreGraphicsState()
-        text(pill, at: CGPoint(x: r.midX, y: r.midY), 11, .semibold, Self.onNeon)
+        text(pill, at: CGPoint(x: r.midX, y: r.midY), 11, .semibold, Theme.accent)
     }
 
     private func sourceLabel() -> String {

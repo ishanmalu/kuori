@@ -16,7 +16,7 @@
 #             libimagequant (GPL-3); dropping either dylib stops vips loading.
 #
 # WebP is the only format ImageIO decodes but can't encode, so cwebp (BSD-3)
-# stands in for vips there. Everything else vips did is native. Kuori still
+# stands in for vips there. Everything else vips did is native. Daisy still
 # finds the omitted engines on PATH, so pass them explicitly for a full build:
 #
 #   Scripts/bundle-engines.sh ffmpeg ffprobe potrace pandoc vips qpdf 7zz unar resvg cwebp

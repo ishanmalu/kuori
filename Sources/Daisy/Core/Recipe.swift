@@ -113,6 +113,6 @@ enum RecipeRunner {
     }
 
     private static func tmp(_ ext: String) -> URL {
-        FileManager.default.temporaryDirectory.appendingPathComponent("kuori-rcp-\(UUID().uuidString).\(ext)")
+        FileManager.default.temporaryDirectory.appendingPathComponent("daisy-rcp-\(UUID().uuidString).\(ext)")
     }
 }
