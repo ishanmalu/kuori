@@ -4,256 +4,344 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Kuori — the file converter that comes to you</title>
-<meta name="description" content="A local file converter for macOS. Hold Shift, drag a file, drop it on a petal. Images, audio, video, documents, archives — all on-device.">
+<meta name="description" content="A local file converter for macOS. Hold Shift, drag a file, drop it on a petal. Images, audio, video, documents, archives — all on-device, nothing uploaded.">
 <link rel="icon" href="img/icon.png">
 <meta property="og:title" content="Kuori — the file converter that comes to you">
 <meta property="og:description" content="Hold Shift, drag a file, drop it on a petal. Everything runs on your Mac.">
 <meta property="og:image" content="img/wheel-convert.png">
+<meta name="theme-color" content="#08090a">
 <style>
-  :root{
-    --neon:#48ff85; --neon-dim:rgba(72,255,133,.14); --neon-line:rgba(72,255,133,.32);
-    --bg:#0a0b0a; --bg-2:#111311; --ink:#f2f5f2; --mute:#8d968d; --line:rgba(242,245,242,.10);
-    --max:1040px;
-  }
-  *{box-sizing:border-box}
-  html{scroll-behavior:smooth}
-  body{
-    margin:0; background:var(--bg); color:var(--ink);
-    font:15px/1.6 -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Helvetica,Arial,sans-serif;
-    -webkit-font-smoothing:antialiased;
-  }
-  a{color:inherit}
-  .wrap{max-width:var(--max); margin:0 auto; padding:0 24px}
+:root{
+  --neon:#4dff8b;
+  --neon-2:#38e8ff;
+  --neon-dim:rgba(77,255,139,.13);
+  --neon-line:rgba(77,255,139,.30);
+  --bg:#08090a;
+  --panel:rgba(255,255,255,.028);
+  --panel-2:rgba(255,255,255,.05);
+  --ink:#f4f7f5;
+  --mute:#8b948f;
+  --faint:#5d655f;
+  --line:rgba(244,247,245,.09);
+  --max:1120px;
+  --r:16px;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth; -webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--bg); color:var(--ink); overflow-x:hidden;
+  font:16px/1.65 -apple-system,BlinkMacSystemFont,"SF Pro Text","Inter","Helvetica Neue",Arial,sans-serif;
+  -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+  font-feature-settings:"cv11","ss01";
+}
+a{color:inherit; text-decoration:none}
+.wrap{max-width:var(--max); margin:0 auto; padding:0 28px; position:relative}
 
-  /* header */
-  header{position:sticky; top:0; z-index:10; backdrop-filter:blur(14px);
-    background:rgba(10,11,10,.72); border-bottom:1px solid var(--line)}
-  .bar{display:flex; align-items:center; gap:12px; height:60px}
-  .brand{display:flex; align-items:center; gap:10px; font-weight:650; letter-spacing:-.01em}
-  .brand img{width:26px; height:26px; border-radius:7px}
-  .bar nav{margin-left:auto; display:flex; gap:22px; font-size:13.5px; color:var(--mute)}
-  .bar nav a:hover{color:var(--ink)}
-  .ghost{border:1px solid var(--neon-line); color:var(--neon); padding:7px 14px;
-    border-radius:999px; font-size:13px; text-decoration:none; white-space:nowrap}
-  .ghost:hover{background:var(--neon-dim)}
+/* ── ambient light ─────────────────────────────────────────── */
+.aurora{position:fixed; inset:0; pointer-events:none; z-index:0; overflow:hidden}
+.aurora i{position:absolute; border-radius:50%; filter:blur(120px); opacity:.24; display:block}
+.a1{width:760px; height:760px; top:-320px; left:50%; margin-left:-380px; background:var(--neon); opacity:.17}
+.a2{width:520px; height:520px; top:36%; left:-180px; background:var(--neon-2); opacity:.10}
+.a3{width:560px; height:560px; bottom:-200px; right:-140px; background:var(--neon); opacity:.09}
+.grain{position:fixed; inset:0; z-index:1; pointer-events:none; opacity:.035; mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E")}
+main,header,footer{position:relative; z-index:2}
 
-  /* hero */
-  .hero{padding:86px 0 64px; text-align:center}
-  h1{font-size:clamp(36px,6vw,60px); line-height:1.04; letter-spacing:-.035em; margin:0 0 18px; font-weight:680}
-  h1 em{font-style:normal; color:var(--neon)}
-  .lede{max-width:600px; margin:0 auto; color:var(--mute); font-size:17px}
-  .keys{display:inline-flex; gap:8px; align-items:center; margin-top:26px; flex-wrap:wrap; justify-content:center}
-  kbd{font:600 12.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--ink);
-    background:var(--bg-2); border:1px solid var(--line); border-bottom-width:2px;
-    border-radius:7px; padding:7px 9px}
-  .keys span{color:var(--mute); font-size:13.5px}
+/* ── nav ───────────────────────────────────────────────────── */
+header{position:sticky; top:0; z-index:50}
+.bar{display:flex; align-items:center; gap:14px; height:66px;
+  border-bottom:1px solid transparent; transition:border-color .3s}
+header.stuck .bar{border-bottom-color:var(--line)}
+header.stuck{backdrop-filter:blur(20px) saturate(160%); background:rgba(8,9,10,.66)}
+.brand{display:flex; align-items:center; gap:10px; font-weight:640; letter-spacing:-.015em; font-size:16.5px}
+.brand img{width:28px; height:28px; border-radius:8px}
+.bar nav{margin-left:auto; display:flex; gap:4px}
+.bar nav a{font-size:13.5px; color:var(--mute); padding:7px 12px; border-radius:9px; transition:.18s}
+.bar nav a:hover{color:var(--ink); background:var(--panel-2)}
+.bar nav a.on{color:var(--neon)}
+.cta{border:1px solid var(--neon-line); color:var(--neon); padding:8px 16px; border-radius:999px;
+  font-size:13.5px; font-weight:560; transition:.2s; white-space:nowrap}
+.cta:hover{background:var(--neon-dim); box-shadow:0 0 24px -6px var(--neon-line)}
 
-  .shot{margin:52px auto 0; max-width:480px; position:relative}
-  .shot img{width:100%; display:block}
-  .shot::after{content:""; position:absolute; inset:12% 12% 6%; z-index:-1;
-    background:var(--neon); filter:blur(90px); opacity:.16; border-radius:50%}
+/* ── type ──────────────────────────────────────────────────── */
+h1{font-size:clamp(40px,7.2vw,76px); line-height:1.01; letter-spacing:-.042em; margin:0 0 20px; font-weight:660}
+h2{font-size:clamp(26px,4vw,40px); line-height:1.1; letter-spacing:-.032em; margin:0 0 14px; font-weight:640}
+.grad{background:linear-gradient(96deg,var(--neon) 10%,var(--neon-2) 90%);
+  -webkit-background-clip:text; background-clip:text; color:transparent}
+.lede{max-width:620px; color:var(--mute); font-size:clamp(16px,1.6vw,18.5px); margin:0 auto}
+.sub{color:var(--mute); margin:0 0 40px; max-width:660px; font-size:16px}
+.eyebrow{display:inline-flex; align-items:center; gap:8px; color:var(--neon); font-size:11.5px;
+  font-weight:650; letter-spacing:.16em; text-transform:uppercase; margin:0 0 14px}
+.eyebrow::before{content:""; width:18px; height:1px; background:var(--neon); opacity:.6}
 
-  /* sections */
-  section{padding:76px 0; border-top:1px solid var(--line)}
-  h2{font-size:clamp(24px,3.4vw,32px); letter-spacing:-.025em; margin:0 0 10px; font-weight:660}
-  .sub{color:var(--mute); margin:0 0 36px; max-width:620px}
-  .eyebrow{color:var(--neon); font-size:12px; font-weight:650; letter-spacing:.14em;
-    text-transform:uppercase; margin:0 0 12px}
+/* ── hero ──────────────────────────────────────────────────── */
+.hero{padding:96px 0 40px; text-align:center}
+.pill{display:inline-flex; align-items:center; gap:9px; border:1px solid var(--line);
+  background:var(--panel); border-radius:999px; padding:6px 14px 6px 8px; font-size:12.5px;
+  color:var(--mute); margin-bottom:30px}
+.pill b{display:inline-flex; align-items:center; gap:5px; color:var(--neon); font-weight:600}
+.dot{width:6px; height:6px; border-radius:50%; background:var(--neon); box-shadow:0 0 10px var(--neon);
+  animation:pulse 2.4s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.keys{display:inline-flex; gap:9px; align-items:center; margin-top:28px; flex-wrap:wrap; justify-content:center;
+  color:var(--faint); font-size:13.5px}
+kbd{font:600 12.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--ink);
+  background:linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.02));
+  border:1px solid var(--line); border-bottom-color:rgba(0,0,0,.5); border-bottom-width:2px;
+  border-radius:8px; padding:7px 10px}
 
-  .steps{display:grid; grid-template-columns:repeat(3,1fr); gap:20px}
-  .step{background:var(--bg-2); border:1px solid var(--line); border-radius:14px; padding:22px}
-  .step b{display:block; margin-bottom:6px; font-weight:620}
-  .step p{margin:0; color:var(--mute); font-size:14px}
-  .n{display:inline-grid; place-items:center; width:24px; height:24px; border-radius:50%;
-    background:var(--neon-dim); color:var(--neon); font-size:12px; font-weight:700; margin-bottom:12px}
+/* ── live wheel ────────────────────────────────────────────── */
+.stage{margin:56px auto 0; width:min(520px,86vw); aspect-ratio:1; position:relative}
+.stage::before{content:""; position:absolute; inset:8%; border-radius:50%;
+  background:radial-gradient(circle,var(--neon) 0%,transparent 68%); opacity:.16; filter:blur(50px)}
+#wheel{width:100%; height:100%; display:block; position:relative; cursor:pointer}
+#wheel .petal{fill:rgba(255,255,255,.05); stroke:rgba(255,255,255,.05); stroke-width:13;
+  stroke-linejoin:round; transition:fill .25s, stroke .25s, filter .25s}
+#wheel .petal.on{fill:var(--neon); stroke:var(--neon);
+  filter:drop-shadow(0 0 16px rgba(77,255,139,.6))}
+#wheel .plabel{fill:#cfd8d3; font:600 13px -apple-system,BlinkMacSystemFont,sans-serif;
+  text-anchor:middle; pointer-events:none; letter-spacing:.02em; transition:fill .22s}
+#wheel .petal.on + .plabel{fill:#062010}
+#wheel .disc{fill:rgba(255,255,255,.022); stroke:rgba(255,255,255,.07); stroke-width:1}
+#wheel .hub{fill:#0c0e0d; stroke:rgba(255,255,255,.10); stroke-width:1}
+#wheel .src{fill:var(--ink); font:600 13px -apple-system,sans-serif; text-anchor:middle}
+#wheel .tgtbox{fill:var(--neon); filter:drop-shadow(0 0 10px rgba(77,255,139,.5))}
+#wheel .tgt{fill:#062010; font:700 12px -apple-system,sans-serif; text-anchor:middle}
+.caption{margin-top:22px; color:var(--faint); font-size:13px}
+.caption b{color:var(--mute); font-weight:500}
 
-  table{width:100%; border-collapse:collapse; font-size:14.5px}
-  th,td{text-align:left; padding:14px 12px; border-bottom:1px solid var(--line); vertical-align:top}
-  th{font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--mute); font-weight:600}
-  td:first-child{font-weight:620; white-space:nowrap; width:118px}
-  td code{color:var(--mute); font:13px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace}
+/* ── reveal ────────────────────────────────────────────────── */
+.rv{opacity:0; transform:translateY(22px); transition:opacity .7s cubic-bezier(.2,.7,.3,1), transform .7s cubic-bezier(.2,.7,.3,1)}
+.rv.in{opacity:1; transform:none}
+@media (prefers-reduced-motion:reduce){.rv{opacity:1; transform:none} .dot{animation:none}}
 
-  .split{display:grid; grid-template-columns:1fr 1fr; gap:44px; align-items:center}
-  .split img{width:100%; max-width:400px; display:block; margin:0 auto}
-  .chips{display:flex; flex-wrap:wrap; gap:8px; margin-top:20px}
-  .chip{border:1px solid var(--line); border-radius:999px; padding:6px 12px; font-size:13px; color:var(--mute)}
-  .chip b{color:var(--neon); font-weight:600}
+/* ── sections ──────────────────────────────────────────────── */
+section{padding:110px 0}
+.divide{height:1px; background:linear-gradient(90deg,transparent,var(--line) 22%,var(--line) 78%,transparent)}
 
-  pre{background:var(--bg-2); border:1px solid var(--line); border-radius:12px;
-    padding:18px 20px; overflow-x:auto; margin:0;
-    font:13px/1.85 ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--ink)}
-  pre .c{color:var(--mute)}
-  pre .k{color:var(--neon)}
+/* marquee */
+.marq{overflow:hidden; mask-image:linear-gradient(90deg,transparent,#000 12%,#000 88%,transparent); padding:6px 0}
+.marq ul{display:flex; gap:14px; list-style:none; margin:0; padding:0; width:max-content; animation:slide 46s linear infinite}
+@keyframes slide{to{transform:translateX(-50%)}}
+.marq li{border:1px solid var(--line); background:var(--panel); border-radius:9px; padding:8px 15px;
+  font:600 12.5px ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--mute); letter-spacing:.04em}
 
-  .note{display:flex; gap:14px; align-items:flex-start; background:var(--bg-2);
-    border:1px solid var(--line); border-left:2px solid var(--neon);
-    border-radius:12px; padding:18px 20px; color:var(--mute); font-size:14px}
+/* bento */
+.bento{display:grid; grid-template-columns:repeat(6,1fr); gap:16px}
+.card{background:var(--panel); border:1px solid var(--line); border-radius:var(--r); padding:26px;
+  position:relative; overflow:hidden; transition:border-color .25s, background .25s, transform .25s}
+.card:hover{border-color:var(--neon-line); background:var(--panel-2); transform:translateY(-3px)}
+.card h3{margin:0 0 8px; font-size:17.5px; font-weight:620; letter-spacing:-.015em}
+.card p{margin:0; color:var(--mute); font-size:14.5px; line-height:1.62}
+.card .ico{width:38px; height:38px; border-radius:11px; display:grid; place-items:center; margin-bottom:16px;
+  background:var(--neon-dim); border:1px solid var(--neon-line); color:var(--neon); font-size:17px}
+.c6{grid-column:span 6} .c4{grid-column:span 4} .c3{grid-column:span 3} .c2{grid-column:span 2}
+.card img{width:100%; border-radius:12px; margin-top:20px; display:block}
+.big{font-size:clamp(30px,4.4vw,44px); font-weight:660; letter-spacing:-.03em; line-height:1; margin:0 0 6px}
 
-  footer{border-top:1px solid var(--line); padding:38px 0 60px; color:var(--mute); font-size:13.5px}
-  .foot{display:flex; gap:18px; flex-wrap:wrap; align-items:center}
-  .foot a{color:var(--mute); text-decoration:none}
-  .foot a:hover{color:var(--neon)}
-  .foot .sp{margin-left:auto}
+/* table */
+.tbl{border:1px solid var(--line); border-radius:var(--r); overflow:hidden; background:var(--panel)}
+table{width:100%; border-collapse:collapse; font-size:14.5px}
+th,td{text-align:left; padding:16px 20px; border-bottom:1px solid var(--line); vertical-align:top}
+tr:last-child td{border-bottom:0}
+tbody tr{transition:background .2s}
+tbody tr:hover{background:rgba(255,255,255,.022)}
+th{font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--faint); font-weight:600}
+td:first-child{font-weight:620; white-space:nowrap; width:120px}
+td code,.mono{font:12.8px/1.75 ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--mute)}
 
-  @media (max-width:760px){
-    .steps,.split{grid-template-columns:1fr}
-    .bar nav{display:none}
-    .hero{padding:56px 0 40px}
-  }
+/* split */
+.split{display:grid; grid-template-columns:1fr 1fr; gap:56px; align-items:center}
+.split img{width:100%; max-width:420px; display:block; margin:0 auto;
+  filter:drop-shadow(0 24px 60px rgba(0,0,0,.55))}
+.chips{display:flex; flex-wrap:wrap; gap:9px; margin-top:22px}
+.chip{border:1px solid var(--line); background:var(--panel); border-radius:999px; padding:7px 14px;
+  font-size:13px; color:var(--mute); transition:.2s}
+.chip:hover{border-color:var(--neon-line); color:var(--ink)}
+.chip.hot{border-color:var(--neon-line); color:var(--neon)}
+
+/* code */
+pre{background:rgba(0,0,0,.42); border:1px solid var(--line); border-radius:var(--r);
+  padding:22px 24px; overflow-x:auto; margin:0;
+  font:13px/1.95 ui-monospace,SFMono-Regular,Menlo,monospace; color:#dfe6e1}
+pre .c{color:var(--faint)} pre .k{color:var(--neon)} pre .s{color:var(--neon-2)}
+.codehead{display:flex; gap:7px; padding:0 0 14px}
+.codehead i{width:11px; height:11px; border-radius:50%; background:rgba(255,255,255,.13); display:block}
+
+.note{display:flex; gap:15px; align-items:flex-start; background:var(--panel);
+  border:1px solid var(--line); border-left:2px solid var(--neon);
+  border-radius:12px; padding:18px 22px; color:var(--mute); font-size:14.5px}
+.note b{color:var(--ink); font-weight:600}
+
+/* footer */
+footer{border-top:1px solid var(--line); padding:44px 0 70px; color:var(--faint); font-size:13.5px}
+.foot{display:flex; gap:22px; flex-wrap:wrap; align-items:center}
+.foot a{color:var(--mute)} .foot a:hover{color:var(--neon)}
+.foot .sp{margin-left:auto}
+
+@media (max-width:880px){
+  .bento{grid-template-columns:repeat(2,1fr)}
+  .c6,.c4,.c3,.c2{grid-column:span 2}
+  .split{grid-template-columns:1fr; gap:36px}
+  .bar nav{display:none}
+  section{padding:76px 0}
+  .hero{padding:60px 0 20px}
+}
 </style>
+<noscript><style>.rv{opacity:1!important;transform:none!important}</style></noscript>
 </head>
 <body>
 
-<header>
+<div class="aurora"><i class="a1"></i><i class="a2"></i><i class="a3"></i></div>
+<div class="grain"></div>
+
+<header id="hd">
   <div class="wrap bar">
-    <span class="brand"><img src="img/icon.png" alt=""> Kuori</span>
+    <a class="brand" href="#"><img src="img/icon.png" alt=""> Kuori</a>
     <nav>
-      <a href="#how">How it works</a>
-      <a href="#formats">Formats</a>
-      <a href="#tools">Tools</a>
-      <a href="#install">Install</a>
+      <a href="#how">How</a><a href="#formats">Formats</a><a href="#tools">Tools</a>
+      <a href="#flow">Recipes</a><a href="#cli">CLI</a><a href="#install">Install</a>
     </nav>
-    <a class="ghost" href="https://github.com/ishanmalu/kuori">GitHub ↗</a>
+    <a class="cta" href="https://github.com/ishanmalu/kuori">GitHub ↗</a>
   </div>
 </header>
 
+<main>
+
 <div class="wrap hero">
-  <h1>The converter that <em>comes to you</em>.</h1>
+  <span class="pill"><b><i class="dot"></i> v0.3</b> · macOS 14+ · Apple Silicon</span>
+  <h1>The converter that<br><span class="grad">comes to you.</span></h1>
   <p class="lede">Hold Shift, drag a file, drop it on a petal. Kuori puts a wheel of every
-    format that file can become right in front of you — and converts it on your Mac,
+    format that file can become right where you are — and converts it on your Mac,
     without uploading a thing.</p>
   <div class="keys">
-    <kbd>⇧</kbd><span>drag a file</span>
-    <span>·</span>
-    <kbd>⌥</kbd><kbd>⇧</kbd><kbd>V</kbd><span>anywhere</span>
+    <kbd>⇧</kbd> drag a file &nbsp;·&nbsp; <kbd>⌥</kbd><kbd>⇧</kbd><kbd>V</kbd> anywhere
   </div>
-  <div class="shot"><img src="img/wheel-convert.png" alt="The Kuori wheel: a PNG in the hub with WEBP, AVIF, BMP, GIF, HEIC, SVG, TIFF and PDF petals around it"></div>
+
+  <div class="stage">
+    <svg id="wheel" viewBox="0 0 560 560" aria-label="Interactive preview of the Kuori conversion wheel"></svg>
+  </div>
+  <p class="caption">Live preview — <b>hover a petal</b></p>
 </div>
 
 <section id="how">
   <div class="wrap">
-    <p class="eyebrow">How it works</p>
-    <h2>Three seconds, no window management.</h2>
-    <p class="sub">No app to bring forward, no file picker, no "choose an output folder"
-      dialog. The wheel appears, you let go, it's done.</p>
-    <div class="steps">
-      <div class="step">
-        <span class="n">1</span>
-        <b>Shift-drag</b>
-        <p>Start dragging a file out of Finder with Shift held. The wheel appears in the
-          middle of your screen, already showing what that file can turn into.</p>
-      </div>
-      <div class="step">
-        <span class="n">2</span>
-        <b>Drop on a petal</b>
+    <div class="marq rv">
+      <ul id="marq"></ul>
+    </div>
+  </div>
+</section>
+
+<div class="wrap"><div class="divide"></div></div>
+
+<section>
+  <div class="wrap">
+    <p class="eyebrow rv">How it works</p>
+    <h2 class="rv">Three seconds, no window management.</h2>
+    <p class="sub rv">No app to bring forward, no file picker, no “choose an output folder”
+      dialog. The wheel appears, you let go, it’s done.</p>
+    <div class="bento">
+      <div class="card c2 rv"><div class="ico">⇧</div>
+        <h3>Shift-drag</h3>
+        <p>Start dragging a file out of Finder with Shift held. The wheel appears, already
+          showing what that file can turn into.</p></div>
+      <div class="card c2 rv"><div class="ico">◎</div>
+        <h3>Drop on a petal</h3>
         <p>Only formats every dragged file can produce are offered, so a mixed selection
-          never gives you a dead end. Arrow keys and ↵ work too.</p>
-      </div>
-      <div class="step">
-        <span class="n">3</span>
-        <b>It's in Finder</b>
+          never gives you a dead end. Arrows and ↵ work too.</p></div>
+      <div class="card c2 rv"><div class="ico">✓</div>
+        <h3>It’s in Finder</h3>
         <p>The result lands next to the original and Finder reveals it. The wheel gets out
-          of your way on its own.</p>
-      </div>
+          of your way on its own.</p></div>
     </div>
   </div>
 </section>
 
 <section id="formats">
   <div class="wrap">
-    <p class="eyebrow">Formats</p>
-    <h2>Everything you actually hit.</h2>
-    <p class="sub">Nine conversion engines are bundled inside the app, so it works on a
+    <p class="eyebrow rv">Formats</p>
+    <h2 class="rv">Everything you actually hit.</h2>
+    <p class="sub rv">Nine conversion engines are bundled inside the app, so it works on a
       machine with nothing installed — no Homebrew, no Python, no first-run download.</p>
-    <table>
-      <tr><th>Class</th><th>Converts</th><th>Engine</th></tr>
-      <tr>
-        <td>Images</td>
-        <td><code>jpg png webp heic avif tiff bmp gif</code> in any direction, SVG → raster, and raster → SVG by tracing</td>
-        <td><code>libvips · ImageIO · resvg · potrace</code></td>
-      </tr>
-      <tr>
-        <td>Audio</td>
-        <td><code>mp3 m4a aac wav flac ogg opus aiff</code></td>
-        <td><code>ffmpeg</code></td>
-      </tr>
-      <tr>
-        <td>Video</td>
-        <td><code>mp4 mov mkv webm avi m4v</code>, plus → GIF and → any audio format</td>
-        <td><code>ffmpeg</code></td>
-      </tr>
-      <tr>
-        <td>Documents</td>
-        <td><code>md html rtf txt epub docx odt</code>, Office → PDF, PDF → txt/docx</td>
-        <td><code>pandoc · LibreOffice</code></td>
-      </tr>
-      <tr>
-        <td>PDF</td>
-        <td>images → PDF, PDF → a folder of <code>png jpg tiff</code> pages</td>
-        <td><code>PDFKit</code></td>
-      </tr>
-      <tr>
-        <td>Archives</td>
-        <td>folder ↔ <code>zip tar tar.gz 7z</code>, and extract <code>zip tar 7z rar</code></td>
-        <td><code>bsdtar · 7-Zip</code></td>
-      </tr>
-    </table>
-    <div class="note" style="margin-top:26px">
-      <span>⚠</span>
-      <div>RAR extraction works; <b style="color:var(--ink)">creating</b> RAR archives doesn't, and
-        won't — there is no licensable RAR encoder. Kuori offers ZIP or 7z instead of
-        pretending otherwise.</div>
+    <div class="tbl rv">
+      <table>
+        <thead><tr><th>Class</th><th>Converts</th><th>Engine</th></tr></thead>
+        <tbody>
+        <tr><td>Images</td>
+          <td><code>jpg png webp heic avif tiff bmp gif</code> in any direction, SVG → raster, raster → SVG by tracing</td>
+          <td class="mono">libvips · ImageIO<br>resvg · potrace</td></tr>
+        <tr><td>Audio</td>
+          <td><code>mp3 m4a aac wav flac ogg opus aiff</code></td>
+          <td class="mono">ffmpeg</td></tr>
+        <tr><td>Video</td>
+          <td><code>mp4 mov mkv webm avi m4v</code>, plus → GIF and → any audio format</td>
+          <td class="mono">ffmpeg</td></tr>
+        <tr><td>Documents</td>
+          <td><code>md html rtf txt epub docx odt</code>, Office → PDF, PDF → txt/docx</td>
+          <td class="mono">pandoc<br>LibreOffice</td></tr>
+        <tr><td>PDF</td>
+          <td>images → PDF, PDF → a folder of <code>png jpg tiff</code> pages</td>
+          <td class="mono">PDFKit</td></tr>
+        <tr><td>Archives</td>
+          <td>folder ↔ <code>zip tar tar.gz 7z</code>, extract <code>zip tar 7z rar</code></td>
+          <td class="mono">bsdtar · 7-Zip</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="note rv" style="margin-top:22px">
+      <span style="color:var(--neon)">▲</span>
+      <div>RAR extraction works. <b>Creating</b> RAR archives doesn’t, and won’t — there is no
+        licensable RAR encoder. Kuori offers ZIP or 7z rather than pretending otherwise.</div>
     </div>
   </div>
 </section>
 
 <section id="tools">
   <div class="wrap">
-    <p class="eyebrow">Tools</p>
-    <h2>Hold ⌥ for the things that aren't conversions.</h2>
-    <p class="sub">Same file, rewritten. Two of these lean on frameworks already in macOS,
+    <p class="eyebrow rv">Tools</p>
+    <h2 class="rv">Hold ⌥ for the things that aren’t conversions.</h2>
+    <p class="sub rv">Same file, rewritten. Two of these lean on frameworks already in macOS,
       so they cost nothing and never leave the machine.</p>
-    <div class="split">
-      <div>
+    <div class="bento">
+      <div class="card c3 rv">
+        <div class="ico">◱</div>
+        <h3>Nine same-format edits</h3>
+        <p>Resize, compress, crop to aspect, trim, strip metadata, merge and split PDFs —
+          each with presets so there is nothing to type.</p>
         <div class="chips">
-          <span class="chip">Resize</span>
-          <span class="chip">Compress</span>
-          <span class="chip">Crop to aspect</span>
-          <span class="chip">Trim</span>
-          <span class="chip">Strip metadata</span>
-          <span class="chip"><b>OCR → searchable PDF</b></span>
-          <span class="chip"><b>Remove background</b></span>
-          <span class="chip">Merge PDF</span>
+          <span class="chip">Resize</span><span class="chip">Compress</span>
+          <span class="chip">Crop</span><span class="chip">Trim</span>
+          <span class="chip">Strip metadata</span><span class="chip">Merge PDF</span>
           <span class="chip">Split PDF</span>
         </div>
-        <p class="sub" style="margin-top:24px">
-          OCR runs Vision and writes a real invisible text layer, so the PDF is selectable
-          and searchable. Background removal uses the same subject-lift the system uses,
-          and gives you a transparent PNG.
-        </p>
       </div>
-      <img src="img/wheel-tools.png" alt="The wheel in Tools mode with Resize, Compress, Crop, Strip metadata, OCR, Remove background, Merge PDF">
+      <div class="card c3 rv"><img src="img/wheel-tools.png" alt="The wheel in Tools mode"></div>
+      <div class="card c3 rv"><div class="ico">⌕</div>
+        <h3>OCR → searchable PDF</h3>
+        <p>Vision reads the page and Kuori writes a real invisible text layer, so the PDF is
+          selectable, searchable and Spotlight-indexed — not a picture of words.</p></div>
+      <div class="card c3 rv"><div class="ico">✂</div>
+        <h3>Remove background</h3>
+        <p>The same subject-lift macOS uses in Preview, applied to a whole selection at once,
+          out as transparent PNG.</p></div>
     </div>
   </div>
 </section>
 
-<section id="recipes">
-  <div class="wrap">
-    <div class="split">
-      <img src="img/wheel-recipes.png" alt="The wheel in Recipes mode listing web-image, square-jpg, reel-to-mp4, clip-to-gif and scan-to-ocr-pdf">
-      <div>
-        <p class="eyebrow">Recipes &amp; watch folders</p>
-        <h2>For the thing you do every week.</h2>
-        <p class="sub">A recipe chains steps: <em>resize to 1600, strip metadata, save as
-          WebP</em>. Point a watch folder at it and anything you drop in that folder is
-          converted and filed automatically, original moved to <code>_processed/</code>.</p>
-        <div class="chips">
-          <span class="chip">web-image</span>
-          <span class="chip">square-jpg</span>
-          <span class="chip">reel-to-mp4</span>
-          <span class="chip">clip-to-gif</span>
-          <span class="chip">scan-to-ocr-pdf</span>
-        </div>
+<section id="flow">
+  <div class="wrap split">
+    <img src="img/wheel-recipes.png" class="rv" alt="The wheel in Recipes mode">
+    <div>
+      <p class="eyebrow rv">Recipes &amp; watch folders</p>
+      <h2 class="rv">For the thing you do every week.</h2>
+      <p class="sub rv" style="margin-bottom:0">A recipe chains steps — <em>resize to 1600,
+        strip metadata, save as WebP</em>. Point a watch folder at one and anything you drop
+        in that folder is converted and filed automatically, the original moved to
+        <code class="mono">_processed/</code>.</p>
+      <div class="chips rv">
+        <span class="chip hot">web-image</span><span class="chip hot">square-jpg</span>
+        <span class="chip hot">reel-to-mp4</span><span class="chip hot">clip-to-gif</span>
+        <span class="chip hot">scan-to-ocr-pdf</span>
       </div>
     </div>
   </div>
@@ -261,60 +349,75 @@
 
 <section id="cli">
   <div class="wrap">
-    <p class="eyebrow">Command line</p>
-    <h2>The same engine, scriptable.</h2>
-    <p class="sub">Everything the wheel can do, <code>kuori</code> can do — same capability
-      graph, same bundled engines.</p>
-<pre><span class="k">kuori</span> convert photo.png --to webp --quality 80
-<span class="k">kuori</span> convert *.jpg --to pdf --out ~/Desktop
-<span class="k">kuori</span> convert shot.png --preset web-jpg      <span class="c"># saved preset</span>
-<span class="k">kuori</span> tool ocr scan.png                     <span class="c"># → scan-ocr.pdf, searchable</span>
+    <div class="split">
+      <div>
+        <p class="eyebrow rv">Command line</p>
+        <h2 class="rv">The same engine, scriptable.</h2>
+        <p class="sub rv">Everything the wheel does, <code class="mono">kuori</code> does —
+          same capability graph, same bundled engines, no separate install.</p>
+      </div>
+      <div class="rv">
+        <div class="codehead"><i></i><i></i><i></i></div>
+<pre><span class="k">kuori</span> convert photo.png <span class="s">--to</span> webp <span class="s">--quality</span> 80
+<span class="k">kuori</span> convert *.jpg <span class="s">--to</span> pdf <span class="s">--out</span> ~/Desktop
+<span class="k">kuori</span> convert shot.png <span class="s">--preset</span> web-jpg
+<span class="k">kuori</span> tool ocr scan.png       <span class="c"># → searchable</span>
 <span class="k">kuori</span> recipe square-jpg *.png
-<span class="k">kuori</span> watch add ~/Dropbox/Incoming --to webp
-<span class="k">kuori</span> formats                              <span class="c"># what converts to what</span></pre>
+<span class="k">kuori</span> watch add ~/Incoming <span class="s">--to</span> webp
+<span class="k">kuori</span> formats                <span class="c"># the whole graph</span></pre>
+      </div>
+    </div>
   </div>
 </section>
 
 <section id="local">
-  <div class="wrap split">
-    <div>
-      <p class="eyebrow">Local only</p>
-      <h2>Nothing is uploaded. Ever.</h2>
-      <p class="sub">The reason this exists: dragging a passport scan, a contract, or a
-        client's raw footage into a free web converter means handing it to someone else's
-        server. Kuori has no network code in the conversion path at all — the engines run
-        as child processes on your Mac and the bytes never leave it.</p>
-      <div class="chips">
-        <span class="chip">No account</span>
-        <span class="chip">No telemetry</span>
-        <span class="chip">No upload</span>
-        <span class="chip">Works offline</span>
+  <div class="wrap">
+    <div class="bento">
+      <div class="card c4 rv">
+        <p class="eyebrow">Local only</p>
+        <h2 style="font-size:clamp(24px,3.2vw,34px)">Nothing is uploaded. Ever.</h2>
+        <p>Dragging a passport scan, a contract, or a client’s raw footage into a free web
+          converter means handing it to someone else’s server. Kuori has no network code in
+          the conversion path at all — the engines run as child processes on your Mac and
+          the bytes never leave it.</p>
+        <div class="chips">
+          <span class="chip">No account</span><span class="chip">No telemetry</span>
+          <span class="chip">No upload</span><span class="chip">Works offline</span>
+        </div>
       </div>
+      <div class="card c2 rv"><p class="big grad">9</p><p>engines bundled in the app</p></div>
+      <div class="card c2 rv"><p class="big grad">0</p><p>bytes leave your Mac</p></div>
+      <div class="card c2 rv"><p class="big grad">50</p><p>checks in the binary</p></div>
+      <div class="card c2 rv"><p class="big grad">MIT</p><p>and the source is right there</p></div>
     </div>
-    <img src="img/wheel-empty.png" alt="The empty Kuori wheel waiting for a file">
   </div>
 </section>
 
 <section id="install">
   <div class="wrap">
-    <p class="eyebrow">Install</p>
-    <h2>Build it yourself.</h2>
-    <p class="sub">Kuori is a personal project, MIT licensed, built the way the rest of my
-      Mac tools are: Swift and AppKit, SwiftPM, no Xcode project, and the safety checks
-      shipped inside the binary.</p>
+    <p class="eyebrow rv">Install</p>
+    <h2 class="rv">Build it yourself.</h2>
+    <p class="sub rv">A personal project, MIT licensed, built the way the rest of my Mac tools
+      are: Swift and AppKit, SwiftPM, no Xcode project, and the safety checks shipped inside
+      the binary.</p>
+    <div class="rv">
+      <div class="codehead"><i></i><i></i><i></i></div>
 <pre>git clone https://github.com/ishanmalu/kuori
 cd kuori
-swift run Kuori --selftest        <span class="c"># 50 graph + logic checks</span>
+swift run Kuori <span class="s">--selftest</span>        <span class="c"># 50 graph + logic checks</span>
 Scripts/bundle-engines.sh         <span class="c"># vendor ffmpeg, vips, pandoc, …</span>
 Scripts/build-app.sh 0.3.0        <span class="c"># → dist/Kuori.app</span></pre>
-    <div class="note" style="margin-top:24px">
-      <span>🍎</span>
-      <div>Apple Silicon, macOS 14 or later. The bundled build is about 350&nbsp;MB because
-        nine conversion engines and ~86 dylibs live inside it; without them Kuori falls back
-        to whatever is on your <code>PATH</code>.</div>
+    </div>
+    <div class="note rv" style="margin-top:24px">
+      <span style="color:var(--neon)">◆</span>
+      <div>Apple Silicon, macOS 14 or later. The bundled build is around <b>350 MB</b> because
+        nine engines and ~86 dylibs live inside it; without them Kuori falls back to whatever
+        is on your <code class="mono">PATH</code>.</div>
     </div>
   </div>
 </section>
+
+</main>
 
 <footer>
   <div class="wrap foot">
@@ -325,5 +428,87 @@ Scripts/build-app.sh 0.3.0        <span class="c"># → dist/Kuori.app</span></p
   </div>
 </footer>
 
+<script>
+(() => {
+  const NS = "http://www.w3.org/2000/svg";
+  const el = (n, a) => { const e = document.createElementNS(NS, n);
+    for (const k in a) e.setAttribute(k, a[k]); return e; };
+
+  // ── the wheel, same geometry the app draws ──────────────────
+  const svg = document.getElementById("wheel");
+  const C = 280, INNER = 103, OUTER = 243, HUB = 84, GAP = 0.14;   // inset for the round stroke
+  const targets = ["PDF","WEBP","AVIF","BMP","GIF","HEIC","SVG","TIFF","JPG"];
+  const n = targets.length, step = (Math.PI * 2) / n, ha = Math.PI / n - GAP / 2;
+  const pol = (r, a) => [C + Math.cos(a) * r, C - Math.sin(a) * r];
+  const ang = i => Math.PI / 2 - i * step;
+
+  svg.appendChild(el("circle", { class: "disc", cx: C, cy: C, r: OUTER + 16 }));
+
+  const petals = [];
+  targets.forEach((name, i) => {
+    const a = ang(i);
+    const [x1,y1] = pol(OUTER, a - ha), [x2,y2] = pol(OUTER, a + ha);
+    const [x3,y3] = pol(INNER, a + ha), [x4,y4] = pol(INNER, a - ha);
+    const d = `M${x1} ${y1} A${OUTER} ${OUTER} 0 0 0 ${x2} ${y2} L${x3} ${y3} A${INNER} ${INNER} 0 0 1 ${x4} ${y4} Z`;
+    const p = el("path", { class: "petal", d, "stroke-linejoin": "round" });
+    const [lx, ly] = pol((INNER + OUTER) / 2 + 4, a);
+    const t = el("text", { class: "plabel", x: lx, y: ly + 4.5 });
+    t.textContent = name;
+    svg.append(p, t);
+    petals.push({ p, t, name });
+    p.addEventListener("mouseenter", () => { hold = true; light(i); });
+    p.addEventListener("mouseleave", () => { hold = false; });
+  });
+
+  svg.appendChild(el("circle", { class: "hub", cx: C, cy: C, r: HUB }));
+  const src = el("text", { class: "src", x: C, y: C - 4 }); src.textContent = "photo.png";
+  const box = el("rect", { class: "tgtbox", x: C - 34, y: C + 14, width: 68, height: 26, rx: 13 });
+  const tgt = el("text", { class: "tgt", x: C, y: C + 31 });
+  svg.append(src, box, tgt);
+
+  let cur = -1, hold = false;
+  function light(i) {
+    if (i === cur) return;
+    cur = i;
+    petals.forEach((q, k) => q.p.classList.toggle("on", k === i));
+    const label = targets[i];
+    tgt.textContent = label;
+    const w = Math.max(58, label.length * 9 + 24);
+    box.setAttribute("width", w); box.setAttribute("x", C - w / 2);
+  }
+  light(0);
+  setInterval(() => { if (!hold) light((cur + 1) % n); }, 1900);
+
+  // ── format marquee ──────────────────────────────────────────
+  const fmts = ["JPG","PNG","WEBP","HEIC","AVIF","TIFF","BMP","GIF","SVG","MP4","MOV","MKV",
+    "WEBM","AVI","M4V","MP3","M4A","AAC","WAV","FLAC","OGG","OPUS","AIFF","PDF","DOCX","ODT",
+    "RTF","TXT","MD","HTML","EPUB","PPTX","XLSX","ZIP","TAR","TAR.GZ","7Z","RAR"];
+  const ul = document.getElementById("marq");
+  [...fmts, ...fmts].forEach(f => { const li = document.createElement("li"); li.textContent = f; ul.append(li); });
+
+  // ── scroll reveal ───────────────────────────────────────────
+  const io = new IntersectionObserver((es) => es.forEach(e => {
+    if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
+  }), { rootMargin: "0px 0px -8% 0px" });
+  document.querySelectorAll(".rv").forEach((n, i) => {
+    n.style.transitionDelay = `${Math.min(i % 6, 5) * 55}ms`;
+    io.observe(n);
+  });
+  // Failsafe: if the observer never fires (background tab, odd embed), show it anyway.
+  setTimeout(() => document.querySelectorAll(".rv").forEach(n => n.classList.add("in")), 2600);
+
+  // ── sticky nav + active section ─────────────────────────────
+  const hd = document.getElementById("hd");
+  const links = [...document.querySelectorAll(".bar nav a")];
+  const secs = links.map(a => document.querySelector(a.getAttribute("href"))).filter(Boolean);
+  addEventListener("scroll", () => {
+    hd.classList.toggle("stuck", scrollY > 12);
+    const y = scrollY + 140;
+    let active = -1;
+    secs.forEach((s, i) => { if (s.offsetTop <= y) active = i; });
+    links.forEach((a, i) => a.classList.toggle("on", i === active));
+  }, { passive: true });
+})();
+</script>
 </body>
 </html>
