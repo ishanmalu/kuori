@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kuori — the file converter that comes to you</title>
+<meta name="description" content="A local file converter for macOS. Hold Shift, drag a file, drop it on a petal. Images, audio, video, documents, archives — all on-device.">
+<link rel="icon" href="img/icon.png">
+<meta property="og:title" content="Kuori — the file converter that comes to you">
+<meta property="og:description" content="Hold Shift, drag a file, drop it on a petal. Everything runs on your Mac.">
+<meta property="og:image" content="img/wheel-convert.png">
+<style>
+  :root{
+    --neon:#48ff85; --neon-dim:rgba(72,255,133,.14); --neon-line:rgba(72,255,133,.32);
+    --bg:#0a0b0a; --bg-2:#111311; --ink:#f2f5f2; --mute:#8d968d; --line:rgba(242,245,242,.10);
+    --max:1040px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font:15px/1.6 -apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  a{color:inherit}
+  .wrap{max-width:var(--max); margin:0 auto; padding:0 24px}
+
+  /* header */
+  header{position:sticky; top:0; z-index:10; backdrop-filter:blur(14px);
+    background:rgba(10,11,10,.72); border-bottom:1px solid var(--line)}
+  .bar{display:flex; align-items:center; gap:12px; height:60px}
+  .brand{display:flex; align-items:center; gap:10px; font-weight:650; letter-spacing:-.01em}
+  .brand img{width:26px; height:26px; border-radius:7px}
+  .bar nav{margin-left:auto; display:flex; gap:22px; font-size:13.5px; color:var(--mute)}
+  .bar nav a:hover{color:var(--ink)}
+  .ghost{border:1px solid var(--neon-line); color:var(--neon); padding:7px 14px;
+    border-radius:999px; font-size:13px; text-decoration:none; white-space:nowrap}
+  .ghost:hover{background:var(--neon-dim)}
+
+  /* hero */
+  .hero{padding:86px 0 64px; text-align:center}
+  h1{font-size:clamp(36px,6vw,60px); line-height:1.04; letter-spacing:-.035em; margin:0 0 18px; font-weight:680}
+  h1 em{font-style:normal; color:var(--neon)}
+  .lede{max-width:600px; margin:0 auto; color:var(--mute); font-size:17px}
+  .keys{display:inline-flex; gap:8px; align-items:center; margin-top:26px; flex-wrap:wrap; justify-content:center}
+  kbd{font:600 12.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--ink);
+    background:var(--bg-2); border:1px solid var(--line); border-bottom-width:2px;
+    border-radius:7px; padding:7px 9px}
+  .keys span{color:var(--mute); font-size:13.5px}
+
+  .shot{margin:52px auto 0; max-width:480px; position:relative}
+  .shot img{width:100%; display:block}
+  .shot::after{content:""; position:absolute; inset:12% 12% 6%; z-index:-1;
+    background:var(--neon); filter:blur(90px); opacity:.16; border-radius:50%}
+
+  /* sections */
+  section{padding:76px 0; border-top:1px solid var(--line)}
+  h2{font-size:clamp(24px,3.4vw,32px); letter-spacing:-.025em; margin:0 0 10px; font-weight:660}
+  .sub{color:var(--mute); margin:0 0 36px; max-width:620px}
+  .eyebrow{color:var(--neon); font-size:12px; font-weight:650; letter-spacing:.14em;
+    text-transform:uppercase; margin:0 0 12px}
+
+  .steps{display:grid; grid-template-columns:repeat(3,1fr); gap:20px}
+  .step{background:var(--bg-2); border:1px solid var(--line); border-radius:14px; padding:22px}
+  .step b{display:block; margin-bottom:6px; font-weight:620}
+  .step p{margin:0; color:var(--mute); font-size:14px}
+  .n{display:inline-grid; place-items:center; width:24px; height:24px; border-radius:50%;
+    background:var(--neon-dim); color:var(--neon); font-size:12px; font-weight:700; margin-bottom:12px}
+
+  table{width:100%; border-collapse:collapse; font-size:14.5px}
+  th,td{text-align:left; padding:14px 12px; border-bottom:1px solid var(--line); vertical-align:top}
+  th{font-size:12px; letter-spacing:.1em; text-transform:uppercase; color:var(--mute); font-weight:600}
+  td:first-child{font-weight:620; white-space:nowrap; width:118px}
+  td code{color:var(--mute); font:13px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace}
+
+  .split{display:grid; grid-template-columns:1fr 1fr; gap:44px; align-items:center}
+  .split img{width:100%; max-width:400px; display:block; margin:0 auto}
+  .chips{display:flex; flex-wrap:wrap; gap:8px; margin-top:20px}
+  .chip{border:1px solid var(--line); border-radius:999px; padding:6px 12px; font-size:13px; color:var(--mute)}
+  .chip b{color:var(--neon); font-weight:600}
+
+  pre{background:var(--bg-2); border:1px solid var(--line); border-radius:12px;
+    padding:18px 20px; overflow-x:auto; margin:0;
+    font:13px/1.85 ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--ink)}
+  pre .c{color:var(--mute)}
+  pre .k{color:var(--neon)}
+
+  .note{display:flex; gap:14px; align-items:flex-start; background:var(--bg-2);
+    border:1px solid var(--line); border-left:2px solid var(--neon);
+    border-radius:12px; padding:18px 20px; color:var(--mute); font-size:14px}
+
+  footer{border-top:1px solid var(--line); padding:38px 0 60px; color:var(--mute); font-size:13.5px}
+  .foot{display:flex; gap:18px; flex-wrap:wrap; align-items:center}
+  .foot a{color:var(--mute); text-decoration:none}
+  .foot a:hover{color:var(--neon)}
+  .foot .sp{margin-left:auto}
+
+  @media (max-width:760px){
+    .steps,.split{grid-template-columns:1fr}
+    .bar nav{display:none}
+    .hero{padding:56px 0 40px}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap bar">
+    <span class="brand"><img src="img/icon.png" alt=""> Kuori</span>
+    <nav>
+      <a href="#how">How it works</a>
+      <a href="#formats">Formats</a>
+      <a href="#tools">Tools</a>
+      <a href="#install">Install</a>
+    </nav>
+    <a class="ghost" href="https://github.com/ishanmalu/kuori">GitHub ↗</a>
+  </div>
+</header>
+
+<div class="wrap hero">
+  <h1>The converter that <em>comes to you</em>.</h1>
+  <p class="lede">Hold Shift, drag a file, drop it on a petal. Kuori puts a wheel of every
+    format that file can become right in front of you — and converts it on your Mac,
+    without uploading a thing.</p>
+  <div class="keys">
+    <kbd>⇧</kbd><span>drag a file</span>
+    <span>·</span>
+    <kbd>⌥</kbd><kbd>⇧</kbd><kbd>V</kbd><span>anywhere</span>
+  </div>
+  <div class="shot"><img src="img/wheel-convert.png" alt="The Kuori wheel: a PNG in the hub with WEBP, AVIF, BMP, GIF, HEIC, SVG, TIFF and PDF petals around it"></div>
+</div>
+
+<section id="how">
+  <div class="wrap">
+    <p class="eyebrow">How it works</p>
+    <h2>Three seconds, no window management.</h2>
+    <p class="sub">No app to bring forward, no file picker, no "choose an output folder"
+      dialog. The wheel appears, you let go, it's done.</p>
+    <div class="steps">
+      <div class="step">
+        <span class="n">1</span>
+        <b>Shift-drag</b>
+        <p>Start dragging a file out of Finder with Shift held. The wheel appears in the
+          middle of your screen, already showing what that file can turn into.</p>
+      </div>
+      <div class="step">
+        <span class="n">2</span>
+        <b>Drop on a petal</b>
+        <p>Only formats every dragged file can produce are offered, so a mixed selection
+          never gives you a dead end. Arrow keys and ↵ work too.</p>
+      </div>
+      <div class="step">
+        <span class="n">3</span>
+        <b>It's in Finder</b>
+        <p>The result lands next to the original and Finder reveals it. The wheel gets out
+          of your way on its own.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="formats">
+  <div class="wrap">
+    <p class="eyebrow">Formats</p>
+    <h2>Everything you actually hit.</h2>
+    <p class="sub">Nine conversion engines are bundled inside the app, so it works on a
+      machine with nothing installed — no Homebrew, no Python, no first-run download.</p>
+    <table>
+      <tr><th>Class</th><th>Converts</th><th>Engine</th></tr>
+      <tr>
+        <td>Images</td>
+        <td><code>jpg png webp heic avif tiff bmp gif</code> in any direction, SVG → raster, and raster → SVG by tracing</td>
+        <td><code>libvips · ImageIO · resvg · potrace</code></td>
+      </tr>
+      <tr>
+        <td>Audio</td>
+        <td><code>mp3 m4a aac wav flac ogg opus aiff</code></td>
+        <td><code>ffmpeg</code></td>
+      </tr>
+      <tr>
+        <td>Video</td>
+        <td><code>mp4 mov mkv webm avi m4v</code>, plus → GIF and → any audio format</td>
+        <td><code>ffmpeg</code></td>
+      </tr>
+      <tr>
+        <td>Documents</td>
+        <td><code>md html rtf txt epub docx odt</code>, Office → PDF, PDF → txt/docx</td>
+        <td><code>pandoc · LibreOffice</code></td>
+      </tr>
+      <tr>
+        <td>PDF</td>
+        <td>images → PDF, PDF → a folder of <code>png jpg tiff</code> pages</td>
+        <td><code>PDFKit</code></td>
+      </tr>
+      <tr>
+        <td>Archives</td>
+        <td>folder ↔ <code>zip tar tar.gz 7z</code>, and extract <code>zip tar 7z rar</code></td>
+        <td><code>bsdtar · 7-Zip</code></td>
+      </tr>
+    </table>
+    <div class="note" style="margin-top:26px">
+      <span>⚠</span>
+      <div>RAR extraction works; <b style="color:var(--ink)">creating</b> RAR archives doesn't, and
+        won't — there is no licensable RAR encoder. Kuori offers ZIP or 7z instead of
+        pretending otherwise.</div>
+    </div>
+  </div>
+</section>
+
+<section id="tools">
+  <div class="wrap">
+    <p class="eyebrow">Tools</p>
+    <h2>Hold ⌥ for the things that aren't conversions.</h2>
+    <p class="sub">Same file, rewritten. Two of these lean on frameworks already in macOS,
+      so they cost nothing and never leave the machine.</p>
+    <div class="split">
+      <div>
+        <div class="chips">
+          <span class="chip">Resize</span>
+          <span class="chip">Compress</span>
+          <span class="chip">Crop to aspect</span>
+          <span class="chip">Trim</span>
+          <span class="chip">Strip metadata</span>
+          <span class="chip"><b>OCR → searchable PDF</b></span>
+          <span class="chip"><b>Remove background</b></span>
+          <span class="chip">Merge PDF</span>
+          <span class="chip">Split PDF</span>
+        </div>
+        <p class="sub" style="margin-top:24px">
+          OCR runs Vision and writes a real invisible text layer, so the PDF is selectable
+          and searchable. Background removal uses the same subject-lift the system uses,
+          and gives you a transparent PNG.
+        </p>
+      </div>
+      <img src="img/wheel-tools.png" alt="The wheel in Tools mode with Resize, Compress, Crop, Strip metadata, OCR, Remove background, Merge PDF">
+    </div>
+  </div>
+</section>
+
+<section id="recipes">
+  <div class="wrap">
+    <div class="split">
+      <img src="img/wheel-recipes.png" alt="The wheel in Recipes mode listing web-image, square-jpg, reel-to-mp4, clip-to-gif and scan-to-ocr-pdf">
+      <div>
+        <p class="eyebrow">Recipes &amp; watch folders</p>
+        <h2>For the thing you do every week.</h2>
+        <p class="sub">A recipe chains steps: <em>resize to 1600, strip metadata, save as
+          WebP</em>. Point a watch folder at it and anything you drop in that folder is
+          converted and filed automatically, original moved to <code>_processed/</code>.</p>
+        <div class="chips">
+          <span class="chip">web-image</span>
+          <span class="chip">square-jpg</span>
+          <span class="chip">reel-to-mp4</span>
+          <span class="chip">clip-to-gif</span>
+          <span class="chip">scan-to-ocr-pdf</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="cli">
+  <div class="wrap">
+    <p class="eyebrow">Command line</p>
+    <h2>The same engine, scriptable.</h2>
+    <p class="sub">Everything the wheel can do, <code>kuori</code> can do — same capability
+      graph, same bundled engines.</p>
+<pre><span class="k">kuori</span> convert photo.png --to webp --quality 80
+<span class="k">kuori</span> convert *.jpg --to pdf --out ~/Desktop
+<span class="k">kuori</span> convert shot.png --preset web-jpg      <span class="c"># saved preset</span>
+<span class="k">kuori</span> tool ocr scan.png                     <span class="c"># → scan-ocr.pdf, searchable</span>
+<span class="k">kuori</span> recipe square-jpg *.png
+<span class="k">kuori</span> watch add ~/Dropbox/Incoming --to webp
+<span class="k">kuori</span> formats                              <span class="c"># what converts to what</span></pre>
+  </div>
+</section>
+
+<section id="local">
+  <div class="wrap split">
+    <div>
+      <p class="eyebrow">Local only</p>
+      <h2>Nothing is uploaded. Ever.</h2>
+      <p class="sub">The reason this exists: dragging a passport scan, a contract, or a
+        client's raw footage into a free web converter means handing it to someone else's
+        server. Kuori has no network code in the conversion path at all — the engines run
+        as child processes on your Mac and the bytes never leave it.</p>
+      <div class="chips">
+        <span class="chip">No account</span>
+        <span class="chip">No telemetry</span>
+        <span class="chip">No upload</span>
+        <span class="chip">Works offline</span>
+      </div>
+    </div>
+    <img src="img/wheel-empty.png" alt="The empty Kuori wheel waiting for a file">
+  </div>
+</section>
+
+<section id="install">
+  <div class="wrap">
+    <p class="eyebrow">Install</p>
+    <h2>Build it yourself.</h2>
+    <p class="sub">Kuori is a personal project, MIT licensed, built the way the rest of my
+      Mac tools are: Swift and AppKit, SwiftPM, no Xcode project, and the safety checks
+      shipped inside the binary.</p>
+<pre>git clone https://github.com/ishanmalu/kuori
+cd kuori
+swift run Kuori --selftest        <span class="c"># 50 graph + logic checks</span>
+Scripts/bundle-engines.sh         <span class="c"># vendor ffmpeg, vips, pandoc, …</span>
+Scripts/build-app.sh 0.3.0        <span class="c"># → dist/Kuori.app</span></pre>
+    <div class="note" style="margin-top:24px">
+      <span>🍎</span>
+      <div>Apple Silicon, macOS 14 or later. The bundled build is about 350&nbsp;MB because
+        nine conversion engines and ~86 dylibs live inside it; without them Kuori falls back
+        to whatever is on your <code>PATH</code>.</div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot">
+    <span>Kuori — Finnish for <em>peel</em>. You drop a file in and the format comes away.</span>
+    <span class="sp"><a href="https://github.com/ishanmalu/kuori">Source</a></span>
+    <span><a href="https://github.com/ishanmalu/Perch">Perch</a></span>
+    <span><a href="https://ishanmalu.github.io">ishanmalu.github.io</a></span>
+  </div>
+</footer>
+
+</body>
+</html>

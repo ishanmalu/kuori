@@ -54,6 +54,12 @@ Shift-drag from Finder, where the OS allows a global mouse monitor
 "Convert with Kuori…" Finder Service. Runs happen on a background queue with a
 progress readout and auto-dismiss on success.
 
+## Site
+
+`docs/` is a one-page product site (dark, neon, screenshots straight out of
+`--shot-ui`). Open `docs/index.html`, or turn on GitHub Pages → *Deploy from
+branch* → `main` / `/docs`.
+
 ## Build & run
 
 ```sh
