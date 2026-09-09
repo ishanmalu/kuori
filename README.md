@@ -106,6 +106,20 @@ up video, audio, WebP, SVG and documents there:
 brew install ffmpeg webp resvg potrace unar qpdf sevenzip pandoc
 ```
 
+## Using it
+
+Hold **⇧** and drag a file out of Finder, or press **⌥⇧V** — the wheel appears
+dead centre. Drop on a petal, or arrow to one and press ↵. With nothing loaded
+the ring is a button: click it (⌘O, or the menu bar's **Convert File…**) and
+Finder's picker opens.
+
+Drop a **folder** and you get both readings of it — every convertible file
+inside becomes a batch, and the folder's own archive targets stay on the wheel.
+So a folder of 40 photos is one click to WebP, or one click to ZIP.
+
+**⌥** swaps Convert for Tools, **⇥** cycles Convert / Tools / Recipes, **esc**
+closes.
+
 ## Bundled engines
 
 The app finds Homebrew copies on a dev machine. For a self-contained `.app`

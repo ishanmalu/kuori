@@ -152,8 +152,41 @@ enum SelfTest {
         expect(EngineLocator.runnable(script.path), "non-Mach-O script is left to the OS")
         try? FileManager.default.removeItem(at: script)
 
+        section("folder drops")
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent("kuori-inputset-\(UUID().uuidString)")
+        let photos = root.appendingPathComponent("photos")
+        try? fm.createDirectory(at: photos.appendingPathComponent("nested"), withIntermediateDirectories: true)
+        for n in ["b.png", "a.png", "c.jpg"] {
+            fm.createFile(atPath: photos.appendingPathComponent(n).path, contents: Data("x".utf8))
+        }
+        fm.createFile(atPath: photos.appendingPathComponent(".hidden.png").path, contents: Data("x".utf8))
+        fm.createFile(atPath: photos.appendingPathComponent("notes.qqq").path, contents: Data("x".utf8))
+        fm.createFile(atPath: photos.appendingPathComponent("nested/deep.png").path, contents: Data("x".utf8))
+
+        let expanded = InputSet.expand([photos])
+        expect(expanded.folder == photos, "a folder of images remembers the folder")
+        expect(expanded.files.count == 3, "only the convertible top-level files are taken")
+        expect(expanded.files.map(\.lastPathComponent) == ["a.png", "b.png", "c.jpg"].sorted {
+            $0.localizedStandardCompare($1) == .orderedAscending
+        }, "expanded files come back in name order")
+        expect(!expanded.files.contains { $0.lastPathComponent.hasPrefix(".") }, "hidden files are skipped")
+        expect(!expanded.files.contains { $0.pathExtension == "qqq" }, "unknown extensions are skipped")
+        expect(!expanded.files.contains { $0.lastPathComponent == "nested" }, "subfolders never become inputs")
+
+        let empty = root.appendingPathComponent("empty")
+        try? fm.createDirectory(at: empty, withIntermediateDirectories: true)
+        let noRoutes = InputSet.expand([empty])
+        expect(noRoutes.folder == nil && noRoutes.files == [empty],
+               "a folder with nothing convertible stays a folder")
+
+        let plain = photos.appendingPathComponent("a.png")
+        expect(InputSet.expand([plain]).folder == nil, "a plain file expands to itself")
+        expect(InputSet.expand([plain, photos]).files.count == 2, "a mixed multi-drop is left alone")
+        try? fm.removeItem(at: root)
+
         section("engine availability (informational)")
-        for id in [EngineID.ffmpeg, .vips, .resvg, .potrace, .pandoc, .qpdf, .sevenzip, .unar, .bsdtar, .exiftool] {
+        for id in [EngineID.ffmpeg, .vips, .cwebp, .resvg, .potrace, .pandoc, .qpdf, .sevenzip, .unar, .bsdtar, .exiftool] {
             let where_ = EngineLocator.path(for: id) ?? "— not found (bundle or brew install)"
             print("  \(id.rawValue.padding(toLength: 10, withPad: " ", startingAt: 0)) \(where_)")
         }

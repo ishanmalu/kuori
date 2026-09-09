@@ -18,6 +18,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let menu = NSMenu()
         menu.addItem(withTitle: "Open Wheel  \(Hotkey.label)", action: #selector(openDropZone), keyEquivalent: "")
+        menu.addItem(withTitle: "Convert File…", action: #selector(chooseAndConvert), keyEquivalent: "o")
         menu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
         menu.addItem(.separator())
         let ver = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
@@ -28,6 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func openDropZone() { DropPanel.shared.toggle() }
+    @objc private func chooseAndConvert() { DropPanel.shared.summonAndChoose() }
     @objc private func openSettings() { SettingsWindow.shared.show() }
 
     /// Finder → Services → "Convert with Kuori…"

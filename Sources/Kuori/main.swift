@@ -45,6 +45,18 @@ if let i = args.firstIndex(of: "--shot-ui") {
     app.run()
 }
 
+// `--demo <files…>` holds the wheel open over the live desktop. The blur is a
+// behind-window effect, so `--shot-ui` (which caches the view offscreen) can't
+// show it — this is how you look at the real thing.
+if args.first == "--demo" {
+    let panel = DropPanel.shared
+    if args.contains("light") { app.appearance = NSAppearance(named: .aqua) }
+    if args.contains("dark") { app.appearance = NSAppearance(named: .darkAqua) }
+    let files = args.dropFirst().filter { $0 != "light" && $0 != "dark" }.map { URL(fileURLWithPath: $0) }
+    files.isEmpty ? panel.showCentered() : panel.load(urls: files)
+    app.run()
+}
+
 // `--drag-probe` reports whether a global mouse-drag monitor gets events here.
 if args.first == "--drag-probe" {
     app.setActivationPolicy(.prohibited)

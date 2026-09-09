@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.5.0
+
+- **Click to choose.** The empty ring is a button now: click it (or press ↵, or
+  ⌘O) and Finder's own picker opens. Dragging is still the fast path, but the
+  wheel no longer requires knowing about Shift-drag to be usable. New menu-bar
+  item, **Convert File…**, does both in one step.
+- **Folder drops do the obvious thing.** Drop a folder of photos and the wheel
+  offers image targets for everything inside it *and* the archive targets for
+  the folder itself — convert 40 images, or zip the folder, from the same wheel.
+  Shallow, name-ordered, hidden files and subfolders skipped.
+- **Liquid glass.** The wheel is a real behind-window blur clipped to the disc,
+  with a lit top rim and a shaded underside so the edge reads as thick. Petals
+  are translucent with their own specular edge; the hub is denser so a thumbnail
+  has something to sit on. It rises into place with a short spring rather than
+  blinking on.
+- The empty ring warms its dashed edge and takes a pointing-hand cursor when the
+  mouse is over it.
+- `InputSet` lifts folder-expansion policy out of the view, where it's testable;
+  nine new checks cover it. 63 in total.
+- New `--demo <files…> [light|dark]` holds the wheel open over the live desktop.
+  `--shot-ui` caches the view offscreen, which a behind-window blur can't
+  survive, so this is the only way to see the real thing.
+
 ## 0.4.0
 
 - **Licence: PolyForm Noncommercial 1.0.0.** Kuori is free to use, read, modify

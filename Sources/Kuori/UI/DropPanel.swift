@@ -20,8 +20,37 @@ final class DropPanel: NSPanel {
         hasShadow = true
         isMovableByWindowBackground = true
         hidesOnDeactivate = false
-        contentView = hud
+
+        // The wheel is glass: a live blur of the desktop behind it, clipped to
+        // the disc, with the HUD's own translucent fills painted on top. The
+        // mask is what keeps the blur circular — a rounded-rect layer mask
+        // would be ignored by the behind-window blur.
+        let blur = NSVisualEffectView(frame: NSRect(x: 0, y: 0, width: 300, height: 300))
+        blur.material = .hudWindow
+        blur.blendingMode = .behindWindow
+        blur.state = .active
+        blur.maskImage = Self.circleMask(diameter: WheelHUD.discDiameter)
+        blur.autoresizingMask = [.width, .height]
+
+        hud.frame = blur.bounds
+        hud.autoresizingMask = [.width, .height]
+        blur.addSubview(hud)
+        contentView = blur
         hud.owner = self
+    }
+
+    /// A centred circle the blur view stretches around. Drawn with a cap inset
+    /// so AppKit's nine-part stretching leaves the curve alone.
+    private static func circleMask(diameter d: CGFloat) -> NSImage {
+        let image = NSImage(size: NSSize(width: d, height: d), flipped: false) { rect in
+            NSColor.black.setFill()
+            NSBezierPath(ovalIn: rect).fill()
+            return true
+        }
+        image.capInsets = NSEdgeInsets(top: d / 2 - 1, left: d / 2 - 1,
+                                       bottom: d / 2 - 1, right: d / 2 - 1)
+        image.resizingMode = .stretch
+        return image
     }
 
     override var canBecomeKey: Bool { true }
@@ -48,9 +77,28 @@ final class DropPanel: NSPanel {
     }
 
     private func present() {
+        let fresh = !isVisible
         makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         makeFirstResponder(hud)
+        if fresh { playEntrance() }
+    }
+
+    /// A short rise into place. The window fades while the content scales up
+    /// from just under full size — enough to read as arriving rather than
+    /// blinking on, and short enough that it never delays a drop.
+    private func playEntrance() {
+        guard let layer = contentView?.layer else { return }
+        alphaValue = 0
+        layer.transform = CATransform3DMakeScale(0.90, 0.90, 1)
+
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.20
+            ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.16, 1.1, 0.3, 1)
+            ctx.allowsImplicitAnimation = true
+            animator().alphaValue = 1
+            layer.transform = CATransform3DIdentity
+        }
     }
 
     private static func clipboardFiles() -> [URL]? {
@@ -89,6 +137,12 @@ final class DropPanel: NSPanel {
         if hud.dragSummoned { hud.dragSummoned = false; orderOut(nil) }
     }
 
+    /// Menu-bar "Convert File…": the wheel plus Finder's picker in one step.
+    func summonAndChoose() {
+        showCentered()
+        hud.chooseFiles()
+    }
+
     /// `--shot-ui` only.
     func previewMode(_ name: String) { hud.forceMode(name) }
 }
@@ -115,10 +169,16 @@ private final class WheelHUD: NSView {
     private var focus = 0
     private var hover: Int?
     private var presetParent: Tool?
+    /// Set when `inputs` came from expanding a dropped folder.
+    private var folderInput: URL?
+    /// Cursor is over the empty ring, which is one big button.
+    private var hoveringEmpty = false
     private var running = false
     private var progress = 0.0
     private var errorText: String?
     private var errorClear: DispatchWorkItem?
+
+    static let discDiameter: CGFloat = 286
 
     private var center: CGPoint { CGPoint(x: bounds.midX, y: bounds.midY) }
     private let discR: CGFloat = 143
@@ -150,10 +210,13 @@ private final class WheelHUD: NSView {
     // MARK: contents
 
     func accept(_ urls: [URL]) {
-        guard urls != inputs else { return }
-        inputs = urls
-        formats = urls.compactMap { Formats.byURL($0) }
-        thumb = urls.count == 1 ? Self.thumbnail(urls[0], side: hubR * 2) : nil
+        let (resolved, folder) = InputSet.expand(urls)
+        guard resolved != inputs || folder != folderInput else { return }
+        folderInput = folder
+        inputs = resolved
+        formats = resolved.compactMap { Formats.byURL($0) }
+        thumb = resolved.count == 1 ? Self.thumbnail(resolved[0], side: hubR * 2)
+              : folder.flatMap { Self.thumbnail($0, side: hubR * 2) }
         presetParent = nil
         running = false
         progress = 0
@@ -186,11 +249,13 @@ private final class WheelHUD: NSView {
         thumb = nil
         items = []
         presetParent = nil
+        folderInput = nil
         hover = nil
         focus = 0
         running = false
         progress = 0
         dragSummoned = false
+        hoveringEmpty = false
         needsDisplay = true
     }
 
@@ -222,7 +287,11 @@ private final class WheelHUD: NSView {
             guard let f = Formats.byURL(url) else { return [] }
             return Set(Engine.targets(for: f).map(\.id))
         }
-        let shared = routes.dropFirst().reduce(routes.first ?? []) { $0.intersection($1) }
+        var shared = routes.dropFirst().reduce(routes.first ?? []) { $0.intersection($1) }
+        // An expanded folder can still be packed as a whole.
+        if folderInput != nil, let folder = Formats.byID["folder"] {
+            shared.formUnion(Engine.targets(for: folder).map(\.id))
+        }
         return shared.compactMap { Formats.byID[$0] }
             .filter { $0.id != "folder" || inputs.allSatisfy { Formats.byURL($0)?.category == .archive } }
             .sorted { ($0.category.rawValue, $0.label) < ($1.category.rawValue, $1.label) }
@@ -258,6 +327,19 @@ private final class WheelHUD: NSView {
     // MARK: run
 
     private func runConvert(to target: Format) {
+        // Packing an expanded folder acts on the folder, not on each file in it.
+        if let folder = folderInput, target.category == .archive {
+            run(count: 1) { report in
+                guard let out = Naming.output(for: folder, target: target, into: nil, collision: .suffix) else {
+                    throw ConvertError.badInput("Couldn't name the archive.")
+                }
+                let written = try Engine.run(input: folder, to: target, output: out, opts: ConvertOptions())
+                report(1)
+                return (written, "\(folder.lastPathComponent) → \(target.label)")
+            }
+            return
+        }
+
         let files = inputs
         run(count: files.count) { report in
             var first: URL?
@@ -399,24 +481,25 @@ private final class WheelHUD: NSView {
         let disc = NSBezierPath(ovalIn: discRect)
 
         guard !inputs.isEmpty else {
-            Theme.paper.withAlphaComponent(0.9).setFill()
+            Theme.glassTint.setFill()
             disc.fill()
-            disc.lineWidth = 1.5
-            disc.setLineDash([6, 5], count: 2, phase: 0)
-            Theme.neon.withAlphaComponent(0.4).setStroke()
-            disc.stroke()
-            text("Drop", at: CGPoint(x: center.x, y: center.y + 14), 14, .semibold, Theme.ink)
-            text("files", at: CGPoint(x: center.x, y: center.y - 4), 14, .semibold, Theme.ink)
+            drawRim()
+            let dashed = NSBezierPath(ovalIn: discRect.insetBy(dx: 9, dy: 9))
+            dashed.lineWidth = 1.5
+            dashed.setLineDash([6, 6], count: 2, phase: 0)
+            Theme.neon.withAlphaComponent(hoveringEmpty ? 0.75 : 0.42).setStroke()
+            dashed.stroke()
+            text("Drop files", at: CGPoint(x: center.x, y: center.y + 16), 14, .semibold, Theme.ink)
+            text("or click to choose", at: CGPoint(x: center.x, y: center.y - 3),
+                 11, .regular, Theme.inkFaint)
             text("⌥ tools   ⇥ mode   esc", at: CGPoint(x: center.x, y: center.y - 30),
                  9, .regular, Theme.inkFaint, tracking: 0.3)
             return
         }
 
-        Theme.paper.withAlphaComponent(0.98).setFill()
+        Theme.glassTint.setFill()
         disc.fill()
-        Theme.hairline.setStroke()
-        disc.lineWidth = 1
-        disc.stroke()
+        drawRim()
 
         if items.isEmpty {
             text("no route for", at: CGPoint(x: center.x, y: center.y + 8), 12, .medium, Theme.ink)
@@ -425,6 +508,34 @@ private final class WheelHUD: NSView {
             for i in items.indices { drawPetal(i) }
         }
         if let errorText { drawToast(errorText) } else { drawHub() }
+    }
+
+    /// What sells the glass: a bright arc along the top of the curve fading to a
+    /// dark one underneath, so the edge reads as a lit bevel rather than a line.
+    /// Drawn as two half-circle strokes rather than a gradient stroke, which
+    /// AppKit can't do directly.
+    private func drawRim() {
+        let inset = discRect.insetBy(dx: 0.75, dy: 0.75)
+
+        for (from, to, colour, width) in [
+            (20.0, 160.0, Theme.specular, 1.6),      // lit top
+            (200.0, 340.0, Theme.glassEdge, 1.3),    // shaded underside
+        ] {
+            let arc = NSBezierPath()
+            arc.appendArc(withCenter: CGPoint(x: inset.midX, y: inset.midY),
+                          radius: inset.width / 2, startAngle: from, endAngle: to)
+            arc.lineWidth = width
+            arc.lineCapStyle = .round
+            colour.setStroke()
+            arc.stroke()
+        }
+
+        // A continuous hairline underneath keeps the circle closed where the two
+        // arcs don't meet.
+        let ring = NSBezierPath(ovalIn: inset)
+        ring.lineWidth = 1
+        Theme.hairline.withAlphaComponent(0.10).setStroke()
+        ring.stroke()
     }
 
     private func drawToast(_ message: String) {
@@ -467,9 +578,11 @@ private final class WheelHUD: NSView {
             if running { Theme.neon.withAlphaComponent(0.35).setFill(); petal.fill() }
             fg = Self.onNeon
         } else {
-            Theme.cardFill.setFill()
+            Theme.petalRest.setFill()
             petal.fill()
-            Theme.hairline.setStroke()
+            // Each petal gets its own thin lit edge, so the whole wheel looks
+            // cut from one sheet of glass rather than printed on the disc.
+            Theme.specular.withAlphaComponent(Theme.specular.alphaComponent * 0.45).setStroke()
             petal.lineWidth = 1
             petal.stroke()
             fg = Theme.ink
@@ -494,7 +607,7 @@ private final class WheelHUD: NSView {
     private func drawHub() {
         let box = NSRect(x: center.x - hubR, y: center.y - hubR, width: hubR * 2, height: hubR * 2)
         let hub = NSBezierPath(ovalIn: box)
-        Theme.paper.setFill()
+        Theme.hubFill.setFill()
         hub.fill()
 
         if let thumb {
@@ -512,7 +625,14 @@ private final class WheelHUD: NSView {
             text(name, at: CGPoint(x: center.x, y: center.y + hubR - 13), 8.5, .semibold,
                  colour, tracking: 1)
         }
-        Theme.hairline.setStroke()
+        // Same bevel as the disc, at hub scale.
+        let hubArc = NSBezierPath()
+        hubArc.appendArc(withCenter: center, radius: hubR - 0.5, startAngle: 25, endAngle: 155)
+        hubArc.lineWidth = 1.2
+        hubArc.lineCapStyle = .round
+        Theme.specular.setStroke()
+        hubArc.stroke()
+        Theme.hairline.withAlphaComponent(0.14).setStroke()
         hub.lineWidth = 1
         hub.stroke()
 
@@ -535,6 +655,7 @@ private final class WheelHUD: NSView {
     }
 
     private func sourceLabel() -> String {
+        if folderInput != nil { return "\(inputs.count) IN FOLDER" }
         if inputs.count > 1 { return "\(inputs.count) FILES" }
         return formats.first?.label ?? inputs.first.map { $0.pathExtension.uppercased() } ?? ""
     }
@@ -577,17 +698,64 @@ private final class WheelHUD: NSView {
     // MARK: input
 
     override func mouseMoved(with e: NSEvent) {
-        let i = petalIndex(at: convert(e.locationInWindow, from: nil))
+        let p = convert(e.locationInWindow, from: nil)
+        if inputs.isEmpty {
+            // The whole empty ring is one target, so say so with the cursor and
+            // by warming the dashed edge.
+            let inside = hypot(p.x - center.x, p.y - center.y) <= discR
+            (inside ? NSCursor.pointingHand : NSCursor.arrow).set()
+            if inside != hoveringEmpty { hoveringEmpty = inside; needsDisplay = true }
+            return
+        }
+        if hoveringEmpty { hoveringEmpty = false }
+        let i = petalIndex(at: p)
         if i != hover { hover = i; needsDisplay = true }
     }
     override func mouseExited(with e: NSEvent) {
-        if hover != nil { hover = nil; needsDisplay = true }
+        NSCursor.arrow.set()
+        if hover != nil || hoveringEmpty { hover = nil; hoveringEmpty = false; needsDisplay = true }
     }
 
     override func mouseDown(with e: NSEvent) {
-        guard !running, let i = petalIndex(at: convert(e.locationInWindow, from: nil)) else { return }
+        guard !running else { return }
+        let p = convert(e.locationInWindow, from: nil)
+        if inputs.isEmpty {
+            if hypot(p.x - center.x, p.y - center.y) <= discR { chooseFiles() }
+            return
+        }
+        guard let i = petalIndex(at: p) else { return }
         focus = i
         items[i].run()
+    }
+
+    /// The empty ring doubles as a button. Dragging is the fast path, but a
+    /// click here opens Finder's own picker — the same wheel either way.
+    func chooseFiles() {
+        // A drag-summoned panel is on a dismiss timer and isn't key; the picker
+        // needs both of those undone or it opens behind and then vanishes.
+        owner?.cancelDragDismiss()
+        dragSummoned = false
+        owner?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = true      // folders are an input too (→ zip)
+        panel.allowsMultipleSelection = true
+        panel.resolvesAliases = true
+        panel.prompt = "Choose"
+        panel.message = "Pick a file to convert."
+        // Free-standing rather than a sheet: the wheel is a borderless 300pt
+        // panel and a sheet hanging off it would be wider than its own parent.
+        // It also has to clear the wheel's floating level to be visible at all.
+        panel.level = .modalPanel
+        panel.begin { [weak self] response in
+            guard let self else { return }
+            self.owner?.makeKeyAndOrderFront(nil)
+            self.owner?.makeFirstResponder(self)
+            guard response == .OK, !panel.urls.isEmpty else { return }
+            self.accept(panel.urls)
+        }
     }
 
     override func keyDown(with e: NSEvent) {
@@ -596,11 +764,15 @@ private final class WheelHUD: NSView {
             if presetParent != nil { presetParent = nil; rebuild() } else { owner?.orderOut(nil) }
         case 123, 126: step(-1)                   // ← ↑
         case 124, 125: step(+1)                   // → ↓
-        case 36, 76:                             // return
-            if !running, items.indices.contains(focus) { items[focus].run() }
+        case 36, 76, 49:                         // return, space
+            if running { return }
+            if inputs.isEmpty { chooseFiles() }
+            else if items.indices.contains(focus) { items[focus].run() }
         case 48: cycleMode()                     // tab
         default:
-            if e.charactersIgnoringModifiers == "v", e.modifierFlags.contains(.command) { paste() }
+            let key = e.charactersIgnoringModifiers
+            if e.modifierFlags.contains(.command), key == "v" { paste() }
+            else if e.modifierFlags.contains(.command), key == "o" { chooseFiles() }
             else { super.keyDown(with: e) }
         }
     }
