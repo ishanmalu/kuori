@@ -86,7 +86,7 @@ enum SelfTest {
         expect(Naming.output(for: srcA, target: jpg, into: nil, collision: .overwrite)?.lastPathComponent == "photo.jpg",
                "overwrite reuses the existing name")
 
-        section("phase 2 — tools & trace")
+        section("tools & trace")
         let pdf = Formats.byID["pdf"]!, svg = Formats.byID["svg"]!
         expect(Tool.resize.applies(to: [jpg], count: 1), "resize applies to images")
         expect(!Tool.resize.applies(to: [mp3], count: 1), "resize skips audio")
@@ -109,7 +109,7 @@ enum SelfTest {
                    "trace plan feeds potrace a PGM")
         } else { expect(false, "jpg->svg plan built") }
 
-        section("phase 3 — documents")
+        section("documents")
         expect(Formats.byID["pptx"] != nil && Formats.byID["xlsx"] != nil, "office formats registered")
         let md = Formats.byID["md"]!
         expect(Engine.targets(for: md).map(\.id).contains("docx"), "md -> docx offered")
@@ -121,7 +121,7 @@ enum SelfTest {
         // existential dispatches to DocConverter, not the no-op extension default.
         expect(Engine.converters.contains { type(of: $0) == DocConverter.self }, "DocConverter is registered")
 
-        section("phase 4 — presets · recipes · tools")
+        section("presets · recipes · tools")
         expect(Presets.named("web-jpg")?.target == "jpg", "preset lookup")
         expect(Presets.named("web-jpg")?.options.quality == 80 && Presets.named("web-jpg")?.options.stripMetadata == true,
                "preset -> options")

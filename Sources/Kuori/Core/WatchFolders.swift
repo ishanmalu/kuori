@@ -1,12 +1,11 @@
 import Foundation
 import CoreServices
 
-/// Auto-convert anything that lands in a watched folder, then move the original
-/// into `<folder>/_processed/`. Runs in-process (the app is a login item). Rules
-/// persist in `watch.json`.
+/// Auto-converts whatever lands in a watched folder, then moves the original to
+/// `<folder>/_processed/`. In-process; rules persist in `watch.json`.
 struct WatchRule: Codable {
     var folder: String
-    var toFormat: String?      // convert target id  (mutually exclusive with recipe)
+    var toFormat: String?      // convert target id — mutually exclusive with recipe
     var recipe: String?        // recipe name
     var quality: Int?
     var enabled: Bool = true
@@ -15,19 +14,33 @@ struct WatchRule: Codable {
 final class WatchFolders {
     static let shared = WatchFolders()
 
-    private(set) var rules: [WatchRule] = []
+    private let lock = NSLock()
+    private var _rules: [WatchRule] = []
     private var stream: FSEventStreamRef?
     private let workQueue = DispatchQueue(label: "kuori.watch", qos: .utility)
     private var inFlight = Set<String>()
 
-    func load() {
-        rules = Support.loadJSON([WatchRule].self, from: "watch.json") ?? []
+    /// A snapshot; the FSEvents callback and the Settings UI both touch this.
+    var rules: [WatchRule] {
+        lock.lock(); defer { lock.unlock() }
+        return _rules
     }
+    private func setRules(_ r: [WatchRule]) {
+        lock.lock(); _rules = r; lock.unlock()
+    }
+
+    func load() { setRules(Support.loadJSON([WatchRule].self, from: "watch.json") ?? []) }
     func save() { Support.saveJSON(rules, to: "watch.json") }
 
-    func add(_ r: WatchRule) { rules.append(r); save(); restart() }
-    func remove(at i: Int) { guard rules.indices.contains(i) else { return }; rules.remove(at: i); save(); restart() }
-    func setEnabled(_ on: Bool, at i: Int) { guard rules.indices.contains(i) else { return }; rules[i].enabled = on; save(); restart() }
+    func add(_ r: WatchRule) { setRules(rules + [r]); save(); restart() }
+    func remove(at i: Int) {
+        var r = rules; guard r.indices.contains(i) else { return }
+        r.remove(at: i); setRules(r); save(); restart()
+    }
+    func setEnabled(_ on: Bool, at i: Int) {
+        var r = rules; guard r.indices.contains(i) else { return }
+        r[i].enabled = on; setRules(r); save(); restart()
+    }
 
     func restart() { stop(); start() }
 
@@ -60,13 +73,13 @@ final class WatchFolders {
         stream = nil
     }
 
-    /// One-shot: process everything already sitting in the watched folders.
+    /// One-shot: handle whatever is already sitting in the watched folders.
     func sweepAll() {
-        for (i, rule) in rules.enumerated() where rule.enabled {
+        for rule in rules where rule.enabled {
             let dir = URL(fileURLWithPath: rule.folder)
             let items = (try? FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)) ?? []
             for f in items where f.lastPathComponent != "_processed" && !f.hasDirectoryPath {
-                process(f, rule: rules[i])
+                process(f, rule: rule)
             }
         }
     }
@@ -79,15 +92,22 @@ final class WatchFolders {
               !url.hasDirectoryPath, url.lastPathComponent.first != "." else { return }
         guard let rule = rules.first(where: { $0.enabled && path.hasPrefix($0.folder + "/") }),
               (path as NSString).deletingLastPathComponent == rule.folder else { return }
-        // debounce: let the file finish writing
+        // give the writer a second to finish
         workQueue.asyncAfter(deadline: .now() + 1.0) { [weak self] in self?.process(url, rule: rule) }
+    }
+
+    private func claim(_ key: String) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        return inFlight.insert(key).inserted
+    }
+    private func release(_ key: String) {
+        lock.lock(); inFlight.remove(key); lock.unlock()
     }
 
     private func process(_ file: URL, rule: WatchRule) {
         let key = file.path
-        guard !inFlight.contains(key), FileManager.default.fileExists(atPath: key) else { return }
-        inFlight.insert(key)
-        defer { inFlight.remove(key) }
+        guard FileManager.default.fileExists(atPath: key), claim(key) else { return }
+        defer { release(key) }
 
         do {
             if let recipeName = rule.recipe, let recipe = Recipes.named(recipeName) {

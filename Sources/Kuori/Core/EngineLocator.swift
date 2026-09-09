@@ -1,10 +1,8 @@
 import Foundation
 
-/// Resolves an `EngineID` to an absolute executable path.
-///
-/// Order: binary bundled inside `Kuori.app/Contents/Resources/engine/`, then an
-/// on-demand engine under Application Support (LibreOffice is fetched there on
-/// first use), then `PATH` and the usual Homebrew prefixes for dev machines.
+/// Resolves an `EngineID` to an executable path. Looks inside the app bundle
+/// first, then Application Support, then `PATH` and the usual Homebrew prefixes
+/// so it also works from `swift run` on a dev machine.
 enum EngineLocator {
     static let binaryName: [EngineID: String] = [
         .ffmpeg: "ffmpeg", .vips: "vips", .resvg: "resvg", .potrace: "potrace",
@@ -17,9 +15,8 @@ enum EngineLocator {
             .appendingPathComponent("Library/Application Support/Kuori/engine", isDirectory: true)
     }
 
-    /// LibreOffice is bring-your-own: a normal install under /Applications, or an
-    /// unpacked copy dropped into Application Support. We never auto-download a
-    /// ~400 MB payload.
+    /// LibreOffice is bring-your-own — a normal /Applications install, or a copy
+    /// dropped into Application Support. Never auto-downloaded (it's ~400 MB).
     static func libreOffice() -> String? {
         let fm = FileManager.default
         let candidates = [
@@ -52,16 +49,5 @@ enum EngineLocator {
             if fm.isExecutableFile(atPath: c) { return c }
         }
         return nil
-    }
-
-    /// ffprobe always lives beside the ffmpeg we resolved.
-    static func ffprobe() -> String? {
-        guard let ff = path(for: .ffmpeg) else { return nil }
-        let sib = (ff as NSString).deletingLastPathComponent + "/ffprobe"
-        return FileManager.default.isExecutableFile(atPath: sib) ? sib : nil
-    }
-
-    static func isAvailable(_ id: EngineID) -> Bool {
-        id == .native || path(for: id) != nil
     }
 }

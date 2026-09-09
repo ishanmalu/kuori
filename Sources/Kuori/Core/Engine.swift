@@ -1,7 +1,6 @@
 import Foundation
 
-/// Conversion back-ends. `native` means "handled in-process by macOS frameworks"
-/// (ImageIO / PDFKit / Vision) — no bundled binary required.
+/// `native` = done in-process with ImageIO / PDFKit / Vision, no binary needed.
 enum EngineID: String {
     case ffmpeg, vips, resvg, potrace, pandoc, libreoffice, qpdf
     case sevenzip = "7zz"
@@ -11,9 +10,8 @@ enum EngineID: String {
 
 struct ConvertOptions {
     var quality: Int? = nil          // 1...100 where the target supports it
-    var scale: String? = nil         // "WIDTHxHEIGHT", either side may be blank
+    var scale: String? = nil         // "WIDTHx" — target width, aspect kept
     var stripMetadata: Bool = false
-    var extra: [String] = []         // passed through verbatim to the engine
 
     var scaleWidth: Int? {
         guard let s = scale?.split(separator: "x").first, let w = Int(s) else { return nil }
@@ -37,13 +35,12 @@ struct Invocation {
 }
 
 protocol Converter {
-    /// Formats this converter can produce from `input` (excluding `input` itself).
+    /// Formats reachable from `input` (never `input` itself).
     func targets(for input: Format) -> [Format]
     func plan(input: URL, from: Format, to: Format, output: URL, opts: ConvertOptions) throws -> Invocation
-    /// Converters that need bespoke, multi-step execution override this and
-    /// return true once they've written `output`. Default: fall through to `plan`.
-    /// Must be a protocol requirement (not just an extension) so calls through
-    /// the `Converter` existential dispatch dynamically.
+    /// Multi-step converters override this and return true once `output` exists.
+    /// It has to be a protocol requirement, not just an extension member, or
+    /// calls through the existential would pick the default.
     func execute(input: URL, from: Format, to: Format, output: URL, opts: ConvertOptions) throws -> Bool
 }
 
@@ -81,7 +78,6 @@ enum Engine {
         DocConverter(),
     ]
 
-    /// De-duplicated list of formats reachable from `input`, sorted by label.
     static func targets(for input: Format) -> [Format] {
         var seen: Set<String> = [input.id]
         var out: [Format] = []
@@ -98,21 +94,22 @@ enum Engine {
         converters.first { $0.targets(for: from).contains(to) }
     }
 
-    /// When we run a binary from inside the app bundle, point glib away from any
-    /// Homebrew GIO/pixbuf module dirs so it never cross-loads a second libgio
-    /// (which triggers an ObjC class-duplicate warning, and worse on a bad day).
+    /// A binary bundled in the app should not pick up Homebrew's GIO / pixbuf
+    /// module dirs — vips would then load a second libgio and warn (or crash).
+    /// Point them at nothing.
     static func bundledEngineEnv(_ binPath: String) -> [String: String]? {
         guard let res = Bundle.main.resourceURL?.appendingPathComponent("engine").path,
               binPath.hasPrefix(res) else { return nil }
+        let none = "\(res)/nonexistent"
         return [
-            "GIO_MODULE_DIR": "\(res)/nonexistent",
-            "GDK_PIXBUF_MODULEDIR": "\(res)/nonexistent",
-            "GSETTINGS_SCHEMA_DIR": "\(res)/nonexistent",
+            "GIO_MODULE_DIR": none,
+            "GDK_PIXBUF_MODULEDIR": none,
+            "GSETTINGS_SCHEMA_DIR": none,
             "G_MESSAGES_DEBUG": "",
         ]
     }
 
-    /// Run a single file → single output conversion. Blocking; call off the main thread from the GUI.
+    /// One file in, one file (or one folder) out. Blocking.
     static func run(input: URL, to target: Format, output: URL, opts: ConvertOptions) throws {
         guard let from = Formats.byURL(input) else {
             throw ConvertError.badInput("Unrecognized file type: \(input.lastPathComponent)")
@@ -121,17 +118,14 @@ enum Engine {
             throw ConvertError.unsupported(from: from.id, to: target.id)
         }
 
-        try FileManager.default.createDirectory(at: output.deletingLastPathComponent(),
-                                                withIntermediateDirectories: true)
+        let parent = output.deletingLastPathComponent()
+        try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
+
         if try conv.execute(input: input, from: from, to: target, output: output, opts: opts) { return }
 
         let plan = try conv.plan(input: input, from: from, to: target, output: output, opts: opts)
-
         if plan.producesDirectory {
             try FileManager.default.createDirectory(at: output, withIntermediateDirectories: true)
-        } else {
-            try FileManager.default.createDirectory(at: output.deletingLastPathComponent(),
-                                                    withIntermediateDirectories: true)
         }
 
         if let kind = plan.nativeKind {
@@ -143,16 +137,17 @@ enum Engine {
         }
 
         var args = plan.args
-        var tmpPGM: URL?
+        var pgm: URL?
         if plan.rasterizeInputToPGM {
-            let tmp = FileManager.default.temporaryDirectory.appendingPathComponent("kuori-\(UUID().uuidString).pgm")
+            let tmp = FileManager.default.temporaryDirectory
+                .appendingPathComponent("kuori-\(UUID().uuidString).pgm")
             try NativeOps.writeGrayPGM(input, to: tmp)
-            tmpPGM = tmp
+            pgm = tmp
             args = args.map { $0 == "{PGM}" ? tmp.path : $0 }
         }
-        defer { if let t = tmpPGM { try? FileManager.default.removeItem(at: t) } }
+        defer { pgm.map { try? FileManager.default.removeItem(at: $0) } }
 
-        let r = ProcessRun.run(bin, args, env: bundledEngineEnv(bin))
+        let r = ProcessRun.run(bin, args, env: bundledEngineEnv(bin), timeout: 600)
         if r.code != 0 {
             let msg = r.stderr.isEmpty ? r.stdout : r.stderr
             throw ConvertError.processFailed(code: r.code, message: String(msg.suffix(600)))

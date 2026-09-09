@@ -8,6 +8,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Recipes.seedFileIfMissing()
         WatchFolders.shared.load()
         WatchFolders.shared.start()
+        DragMonitor.shared.start()
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
@@ -15,7 +16,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         let menu = NSMenu()
-        menu.addItem(withTitle: "Drop Zone", action: #selector(openDropZone), keyEquivalent: "d")
+        menu.addItem(withTitle: "Open Wheel", action: #selector(openDropZone), keyEquivalent: "d")
         menu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
         menu.addItem(.separator())
         let ver = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"

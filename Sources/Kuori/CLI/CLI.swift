@@ -192,7 +192,7 @@ enum CLI {
             }
             return 0
         case "add":
-            var rest = Array(args.dropFirst())
+            let rest = Array(args.dropFirst())
             var rule = WatchRule(folder: "")
             var i = 0
             while i < rest.count {

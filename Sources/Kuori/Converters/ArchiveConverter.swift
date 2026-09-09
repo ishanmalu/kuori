@@ -1,8 +1,8 @@
 import Foundation
 
-/// Folder ⇄ archive. Extraction goes through `bsdtar` (libarchive reads zip,
-/// tar.*, 7z, and RARv5). Creation covers zip/tar/tar.gz via bsdtar and 7z via
-/// the bundled `7zz`. Archive→archive repacking is Phase 2.
+/// Folder ⇄ archive. `bsdtar` extracts everything libarchive can read (zip,
+/// tar.*, 7z, RARv5); creation is zip/tar/tar.gz through bsdtar and 7z through
+/// the bundled `7zz`. No archive→archive repack yet.
 struct ArchiveConverter: Converter {
     static let creatable = ["zip", "tar", "targz", "7z"]
 

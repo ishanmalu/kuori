@@ -1,10 +1,9 @@
 import AppKit
 import UniformTypeIdentifiers
 
-/// The floating HUD — a radial wheel, like Tangerine. Drop files; the source
-/// sits in the hub and the targets fan out as petals. Click a petal, or move
-/// with the arrow keys and press ↵. ⌥ swaps Convert → Tools; ⇥ cycles
-/// Convert / Tools / Recipes. Monochrome, one ink / one paper.
+/// The radial wheel. The source file sits in the hub, targets fan out as petals.
+/// Drop a file onto a petal, or move with the arrow keys and press return.
+/// ⌥ swaps Convert for Tools; ⇥ cycles Convert / Tools / Recipes.
 final class DropPanel: NSPanel {
     static let shared = DropPanel()
 
@@ -30,27 +29,46 @@ final class DropPanel: NSPanel {
     func toggle() { isVisible ? orderOut(nil) : showCentered() }
 
     func showCentered() {
-        if let screen = NSScreen.main {
-            let f = screen.visibleFrame
-            setFrameOrigin(NSPoint(x: f.midX - frame.width / 2, y: f.midY - frame.height / 2 + 30))
+        if let vf = NSScreen.main?.visibleFrame {
+            setFrameOrigin(NSPoint(x: vf.midX - frame.width / 2, y: vf.midY - frame.height / 2 + 30))
         }
         makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         makeFirstResponder(hud)
     }
 
+    /// From the menu, Services, or a paste — an interactive open.
     func load(urls: [URL]) {
         showCentered()
         hud.accept(urls)
     }
 
-    func fitToContent() {}   // fixed-size wheel
+    /// From `DragMonitor`: a Shift-drag is in progress. Appear under the cursor
+    /// without taking focus, so the drag keeps running and can land on a petal.
+    func beginDrop(urls: [URL], at point: NSPoint) {
+        position(around: point)
+        hud.dragSummoned = true
+        orderFront(nil)
+        hud.accept(urls)
+    }
 
-    /// Used only by `--shot-ui` to render a non-default mode headlessly.
+    func dismissIfDragSummoned() {
+        if hud.dragSummoned { hud.dragSummoned = false; orderOut(nil) }
+    }
+
+    private func position(around p: NSPoint) {
+        var o = NSPoint(x: p.x - frame.width / 2, y: p.y - frame.height / 2)
+        let screen = NSScreen.screens.first { $0.frame.contains(p) } ?? NSScreen.main
+        if let vf = screen?.visibleFrame {
+            o.x = min(max(o.x, vf.minX + 8), vf.maxX - frame.width - 8)
+            o.y = min(max(o.y, vf.minY + 8), vf.maxY - frame.height - 8)
+        }
+        setFrameOrigin(o)
+    }
+
+    /// `--shot-ui` only.
     func previewMode(_ name: String) { hud.forceMode(name) }
 }
-
-// MARK: - Wheel model
 
 private struct WheelItem {
     let title: String
@@ -60,6 +78,7 @@ private struct WheelItem {
 
 private final class WheelHUD: NSView {
     weak var owner: DropPanel?
+    var dragSummoned = false
 
     private enum Mode: CaseIterable { case convert, tools, recipes }
     private var stickyMode: Mode?
@@ -68,28 +87,26 @@ private final class WheelHUD: NSView {
 
     private var inputs: [URL] = []
     private var formats: [Format] = []
+    private var thumb: NSImage?
     private var items: [WheelItem] = []
     private var focus = 0
     private var hover: Int?
     private var presetParent: Tool?
     private var running = false
-    private var progress: Double = 0
-    private var statusText = ""
+    private var progress = 0.0
 
-    // geometry — the HUD is just this circle, no card behind it
     private var center: CGPoint { CGPoint(x: bounds.midX, y: bounds.midY) }
     private let discR: CGFloat = 143
     private let hubR: CGFloat = 44
     private let innerR: CGFloat = 50
     private let outerR: CGFloat = 134
     private var midR: CGFloat { (innerR + outerR) / 2 }
-    private let petalGap: CGFloat = 0.10   // radians between petals
+    private let petalGap: CGFloat = 0.10
 
     override init(frame f: NSRect) {
         super.init(frame: f)
         registerForDraggedTypes([.fileURL])
         wantsLayer = true
-        resetEmpty()
     }
     required init?(coder: NSCoder) { fatalError() }
 
@@ -105,19 +122,16 @@ private final class WheelHUD: NSView {
                                        owner: self))
     }
 
-    // MARK: state
-
-    private func resetEmpty() {
-        inputs = []; formats = []; items = []; presetParent = nil
-        statusText = ""
-        needsDisplay = true
-    }
+    // MARK: contents
 
     func accept(_ urls: [URL]) {
+        guard urls != inputs else { return }
         inputs = urls
         formats = urls.compactMap { Formats.byURL($0) }
+        thumb = urls.count == 1 ? Self.thumbnail(urls[0], side: hubR * 2) : nil
         presetParent = nil
-        running = false; progress = 0; statusText = ""
+        running = false
+        progress = 0
         rebuild()
     }
 
@@ -137,7 +151,7 @@ private final class WheelHUD: NSView {
         guard !inputs.isEmpty else { needsDisplay = true; return }
         switch mode {
         case .convert: items = convertItems()
-        case .tools:   items = presetParent != nil ? presetItems(presetParent!) : toolItems()
+        case .tools:   items = presetParent.map(presetItems) ?? toolItems()
         case .recipes: items = recipeItems()
         }
         focus = min(focus, max(0, items.count - 1))
@@ -145,23 +159,21 @@ private final class WheelHUD: NSView {
     }
 
     private func convertItems() -> [WheelItem] {
-        let perFile = inputs.map { url -> Set<String> in
+        let routes = inputs.map { url -> Set<String> in
             guard let f = Formats.byURL(url) else { return [] }
             return Set(Engine.targets(for: f).map(\.id))
         }
-        let shared = perFile.dropFirst().reduce(perFile.first ?? []) { $0.intersection($1) }
-        let targets = shared.compactMap { Formats.byID[$0] }
+        let shared = routes.dropFirst().reduce(routes.first ?? []) { $0.intersection($1) }
+        return shared.compactMap { Formats.byID[$0] }
             .filter { $0.id != "folder" || inputs.allSatisfy { Formats.byURL($0)?.category == .archive } }
             .sorted { ($0.category.rawValue, $0.label) < ($1.category.rawValue, $1.label) }
-        return targets.map { fmt in
-            WheelItem(title: fmt.label, symbol: nil) { [weak self] in self?.runConvert(to: fmt) }
-        }
+            .map { fmt in WheelItem(title: fmt.label, symbol: nil) { [weak self] in self?.runConvert(to: fmt) } }
     }
 
     private func toolItems() -> [WheelItem] {
-        Tool.allCases.filter { $0.applies(to: formats, count: inputs.count) }.map { t in
-            WheelItem(title: t.wheelLabel, symbol: t.symbol) { [weak self] in self?.pickTool(t) }
-        }
+        Tool.allCases
+            .filter { $0.applies(to: formats, count: inputs.count) }
+            .map { t in WheelItem(title: t.wheelLabel, symbol: t.symbol) { [weak self] in self?.pickTool(t) } }
     }
 
     private func presetItems(_ t: Tool) -> [WheelItem] {
@@ -202,8 +214,8 @@ private final class WheelHUD: NSView {
 
     private func runTool(_ tool: Tool, preset: ToolPreset?) {
         let files = inputs
-        let total = tool == .pdfMerge ? 1 : files.count
-        run(count: total) { report in
+        let steps = (tool == .pdfMerge || tool == .pdfSplit) ? 1 : files.count
+        run(count: steps) { report in
             if tool == .pdfMerge || tool == .pdfSplit {
                 let outs = try ToolRunner.run(tool, inputs: files, params: ToolRunner.Params(preset: preset))
                 report(1)
@@ -232,64 +244,69 @@ private final class WheelHUD: NSView {
         }
     }
 
-    private func run(count: Int, _ work: @escaping (_ report: @escaping (Int) -> Void) throws -> (URL?, String)) {
+    private func run(count: Int,
+                     _ work: @escaping (_ report: @escaping (Int) -> Void) throws -> (URL?, String)) {
         guard !running else { return }
-        running = true; progress = 0; statusText = ""; needsDisplay = true
-        let q = DispatchQueue(label: "kuori.run", qos: .userInitiated)
-        q.async { [weak self] in
+        running = true
+        progress = 0
+        needsDisplay = true
+
+        DispatchQueue(label: "kuori.run", qos: .userInitiated).async { [weak self] in
             let report: (Int) -> Void = { done in
-                DispatchQueue.main.async { self?.progress = Double(done) / Double(max(1, count)); self?.needsDisplay = true }
+                DispatchQueue.main.async {
+                    self?.progress = Double(done) / Double(max(1, count))
+                    self?.needsDisplay = true
+                }
             }
             do {
-                let (reveal, summary) = try work(report)
+                let (reveal, _) = try work(report)
                 DispatchQueue.main.async {
-                    self?.progress = 1; self?.statusText = summary; self?.needsDisplay = true
+                    self?.progress = 1
+                    self?.needsDisplay = true
                     if let reveal { NSWorkspace.shared.activateFileViewerSelecting([reveal]) }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                        self?.owner?.orderOut(nil); self?.finishRun()
+                        self?.owner?.orderOut(nil)
+                        self?.running = false
+                        self?.progress = 0
                     }
                 }
             } catch {
                 DispatchQueue.main.async {
-                    self?.statusText = error.localizedDescription
-                    self?.running = false; self?.progress = 0; self?.needsDisplay = true
+                    self?.running = false
+                    self?.progress = 0
+                    self?.needsDisplay = true
+                    NSSound.beep()
                 }
             }
         }
     }
 
-    private func finishRun() { running = false; progress = 0; statusText = ""; needsDisplay = true }
+    // MARK: geometry
 
-    // MARK: geometry helpers
-
-    /// Bisector angle for petal `i`, math orientation (from +x, ccw), index 0 at 12 o'clock.
+    /// Bisector of petal `i`, measured from +x counter-clockwise, index 0 at 12 o'clock.
     private func angle(_ i: Int) -> CGFloat {
-        let n = max(1, items.count)
-        return .pi / 2 - CGFloat(i) * (2 * .pi / CGFloat(n))
+        .pi / 2 - CGFloat(i) * (2 * .pi / CGFloat(max(1, items.count)))
     }
 
     private var petalHalfAngle: CGFloat {
-        let n = max(1, items.count)
-        return max(0.14, .pi / CGFloat(n) - petalGap / 2)
+        max(0.14, .pi / CGFloat(max(1, items.count)) - petalGap / 2)
     }
 
     private func polar(_ r: CGFloat, _ a: CGFloat) -> CGPoint {
         CGPoint(x: center.x + cos(a) * r, y: center.y + sin(a) * r)
     }
 
-    /// A rounded, gently-flared annular segment — a citrus wedge that hugs the ring.
     private func petalPath(_ i: Int) -> NSBezierPath {
         let a = angle(i), ha = petalHalfAngle
         let pts = [
             polar(innerR, a - ha), polar(innerR, a), polar(innerR, a + ha),
             polar(outerR, a + ha), polar(outerR, a), polar(outerR, a - ha),
         ]
-        let r: CGFloat = 9
         let path = NSBezierPath()
         func mid(_ p: CGPoint, _ q: CGPoint) -> CGPoint { CGPoint(x: (p.x + q.x) / 2, y: (p.y + q.y) / 2) }
         path.move(to: mid(pts[pts.count - 1], pts[0]))
         for k in pts.indices {
-            path.appendArc(from: pts[k], to: pts[(k + 1) % pts.count], radius: r)
+            path.appendArc(from: pts[k], to: pts[(k + 1) % pts.count], radius: 9)
         }
         path.close()
         return path
@@ -300,8 +317,7 @@ private final class WheelHUD: NSView {
         let dx = p.x - center.x, dy = p.y - center.y
         let r = (dx * dx + dy * dy).squareRoot()
         guard r >= innerR - 6, r <= outerR + 6 else { return nil }
-        let ang = atan2(dy, dx)
-        let ha = petalHalfAngle
+        let ang = atan2(dy, dx), ha = petalHalfAngle
         for i in items.indices {
             var d = ang - angle(i)
             while d > .pi { d -= 2 * .pi }
@@ -313,30 +329,34 @@ private final class WheelHUD: NSView {
 
     // MARK: paint
 
-    private func discRect() -> NSRect {
+    private var discRect: NSRect {
         NSRect(x: center.x - discR, y: center.y - discR, width: discR * 2, height: discR * 2)
     }
 
     override func draw(_ dirty: NSRect) {
+        let disc = NSBezierPath(ovalIn: discRect)
+
         guard !inputs.isEmpty else {
-            let ring = NSBezierPath(ovalIn: discRect())
-            Theme.paper.withAlphaComponent(0.9).setFill(); ring.fill()
-            ring.lineWidth = 1.5
-            ring.setLineDash([6, 5], count: 2, phase: 0)
-            Theme.hairline.setStroke(); ring.stroke()
-            drawCentered("Drop", at: CGPoint(x: center.x, y: center.y + 9), size: 14, weight: .semibold, color: Theme.ink)
-            drawCentered("files", at: CGPoint(x: center.x, y: center.y - 9), size: 14, weight: .semibold, color: Theme.ink)
+            Theme.paper.withAlphaComponent(0.9).setFill()
+            disc.fill()
+            disc.lineWidth = 1.5
+            disc.setLineDash([6, 5], count: 2, phase: 0)
+            Theme.hairline.setStroke()
+            disc.stroke()
+            text("Drop", at: CGPoint(x: center.x, y: center.y + 9), 14, .semibold, Theme.ink)
+            text("files", at: CGPoint(x: center.x, y: center.y - 9), 14, .semibold, Theme.ink)
             return
         }
 
-        // the circle — the only "surface" there is
-        let disc = NSBezierPath(ovalIn: discRect())
-        Theme.paper.withAlphaComponent(0.98).setFill(); disc.fill()
-        Theme.hairline.withAlphaComponent(0.7).setStroke(); disc.lineWidth = 1; disc.stroke()
+        Theme.paper.withAlphaComponent(0.98).setFill()
+        disc.fill()
+        Theme.hairline.withAlphaComponent(0.7).setStroke()
+        disc.lineWidth = 1
+        disc.stroke()
 
         if items.isEmpty {
-            drawCentered("no route for", at: CGPoint(x: center.x, y: center.y + 8), size: 12, weight: .medium, color: Theme.ink)
-            drawCentered("this selection", at: CGPoint(x: center.x, y: center.y - 10), size: 12, weight: .medium, color: Theme.ink)
+            text("no route for", at: CGPoint(x: center.x, y: center.y + 8), 12, .medium, Theme.ink)
+            text("this selection", at: CGPoint(x: center.x, y: center.y - 10), 12, .medium, Theme.ink)
         } else {
             for i in items.indices { drawPetal(i) }
         }
@@ -347,67 +367,56 @@ private final class WheelHUD: NSView {
         let active = (hover ?? focus) == i
         let petal = petalPath(i)
 
-        if active {
-            Theme.ink.setFill()
-        } else {
-            Theme.ink.withAlphaComponent(0.06).setFill()
-        }
+        (active ? Theme.ink : Theme.ink.withAlphaComponent(0.06)).setFill()
         petal.fill()
-        if running { (active ? Theme.paper : Theme.ink).withAlphaComponent(0.3).setFill(); petal.fill() }
+        if running {
+            (active ? Theme.paper : Theme.ink).withAlphaComponent(0.3).setFill()
+            petal.fill()
+        }
 
         let item = items[i]
         let fg = active ? Theme.paper : Theme.ink
-        let a = angle(i)
-        let p = polar(midR + 5, a)
+        let p = polar(midR + 5, angle(i))
         var labelY = p.y
-        if let sym = item.symbol,
-           let img = NSImage(systemSymbolName: sym, accessibilityDescription: nil)?
+        if let name = item.symbol,
+           let icon = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
             .withSymbolConfiguration(.init(pointSize: 12, weight: .regular)) {
-            img.isTemplate = true
-            let s: CGFloat = 14
+            icon.isTemplate = true
             fg.set()
-            img.draw(in: NSRect(x: p.x - s / 2, y: p.y + 4, width: s, height: s),
-                     from: .zero, operation: .sourceOver, fraction: 1,
-                     respectFlipped: true, hints: [.interpolation: NSImageInterpolation.high])
+            icon.draw(in: NSRect(x: p.x - 7, y: p.y + 4, width: 14, height: 14),
+                      from: .zero, operation: .sourceOver, fraction: 1,
+                      respectFlipped: true, hints: [.interpolation: NSImageInterpolation.high])
             labelY = p.y - 10
         }
-        drawCentered(item.title, at: CGPoint(x: p.x, y: labelY), size: 10.5, weight: .semibold,
-                     color: fg, tracking: 0.2, maxWidth: 88)
+        text(item.title, at: CGPoint(x: p.x, y: labelY), 10.5, .semibold, fg, tracking: 0.2, maxWidth: 88)
     }
 
-    /// The hub carries the source file (a thumbnail when it's an image, else its
-    /// type / count) with the current target on a small pill — like Tangerine.
     private func drawHub() {
-        let hubRect = NSRect(x: center.x - hubR, y: center.y - hubR, width: hubR * 2, height: hubR * 2)
-        let hub = NSBezierPath(ovalIn: hubRect)
-        Theme.paper.setFill(); hub.fill()
+        let box = NSRect(x: center.x - hubR, y: center.y - hubR, width: hubR * 2, height: hubR * 2)
+        let hub = NSBezierPath(ovalIn: box)
+        Theme.paper.setFill()
+        hub.fill()
 
-        if inputs.count == 1, let img = NSImage(contentsOf: inputs[0]), img.size.width > 0 {
+        if let thumb {
             NSGraphicsContext.saveGraphicsState()
             hub.addClip()
-            let side = max(hubRect.width, hubRect.height)
-            let scale = side / min(img.size.width, img.size.height)
-            let dw = img.size.width * scale, dh = img.size.height * scale
-            img.draw(in: NSRect(x: center.x - dw / 2, y: center.y - dh / 2, width: dw, height: dh),
-                     from: .zero, operation: .sourceOver, fraction: 1)
+            thumb.draw(in: box, from: .zero, operation: .sourceOver, fraction: 1)
             NSGraphicsContext.restoreGraphicsState()
         } else {
-            drawCentered(sourceLabel(), at: CGPoint(x: center.x, y: center.y + 4), size: 12, weight: .semibold, color: Theme.ink)
+            text(sourceLabel(), at: CGPoint(x: center.x, y: center.y + 4), 12, .semibold, Theme.ink)
         }
-        Theme.hairline.setStroke(); hub.lineWidth = 1; hub.stroke()
+        Theme.hairline.setStroke()
+        hub.lineWidth = 1
+        hub.stroke()
 
-        // target pill
         let pill = running ? "\(Int(progress * 100))%"
-            : presetParent != nil ? presetParent!.label.uppercased()
-            : (focusTitle() ?? "")
+            : presetParent.map { $0.label.uppercased() } ?? (focusTitle() ?? "")
         guard !pill.isEmpty else { return }
-        let font = NSFont.systemFont(ofSize: 11, weight: .semibold)
-        let tw = (pill as NSString).size(withAttributes: [.font: font]).width
-        let pw = tw + 18, ph: CGFloat = 20
-        let pr = NSRect(x: center.x - pw / 2, y: center.y - hubR + 6, width: pw, height: ph)
-        let pillPath = NSBezierPath(roundedRect: pr, xRadius: ph / 2, yRadius: ph / 2)
-        Theme.ink.setFill(); pillPath.fill()
-        drawCentered(pill, at: CGPoint(x: pr.midX, y: pr.midY), size: 11, weight: .semibold, color: Theme.paper)
+        let width = (pill as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 11, weight: .semibold)]).width + 18
+        let r = NSRect(x: center.x - width / 2, y: center.y - hubR + 6, width: width, height: 20)
+        Theme.ink.setFill()
+        NSBezierPath(roundedRect: r, xRadius: 10, yRadius: 10).fill()
+        text(pill, at: CGPoint(x: r.midX, y: r.midY), 11, .semibold, Theme.paper)
     }
 
     private func sourceLabel() -> String {
@@ -415,62 +424,68 @@ private final class WheelHUD: NSView {
         return formats.first?.label ?? inputs.first.map { $0.pathExtension.uppercased() } ?? ""
     }
 
-    private var activeIndex: Int { hover ?? focus }
     private func focusTitle() -> String? {
-        items.indices.contains(activeIndex) ? items[activeIndex].title.replacingOccurrences(of: "\n", with: " ") : nil
+        let i = hover ?? focus
+        return items.indices.contains(i) ? items[i].title.replacingOccurrences(of: "\n", with: " ") : nil
     }
 
-    private func drawCentered(_ s: String, y: CGFloat, size: CGFloat, weight: NSFont.Weight,
-                              color: NSColor, tracking: CGFloat = 0) {
-        drawCentered(s, at: CGPoint(x: bounds.midX, y: y), size: size, weight: weight, color: color, tracking: tracking)
-    }
-    private func drawCentered(_ s: String, at p: CGPoint, size: CGFloat, weight: NSFont.Weight,
-                              color: NSColor, tracking: CGFloat = 0, maxWidth: CGFloat = 400) {
+    private func text(_ s: String, at p: CGPoint, _ size: CGFloat, _ weight: NSFont.Weight,
+                      _ color: NSColor, tracking: CGFloat = 0, maxWidth: CGFloat = 400) {
         guard !s.isEmpty else { return }
         var attrs: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: size, weight: weight), .foregroundColor: color,
+            .font: NSFont.systemFont(ofSize: size, weight: weight),
+            .foregroundColor: color,
         ]
         if tracking != 0 { attrs[.kern] = tracking }
         let para = NSMutableParagraphStyle()
-        para.lineBreakMode = .byTruncatingTail
         para.alignment = .center
+        para.lineBreakMode = .byTruncatingTail
         attrs[.paragraphStyle] = para
         let str = NSAttributedString(string: s, attributes: attrs)
         let box = str.boundingRect(with: NSSize(width: maxWidth, height: 60),
                                    options: [.usesLineFragmentOrigin, .usesFontLeading])
-        str.draw(with: NSRect(x: p.x - box.width / 2, y: p.y - box.height / 2,
-                              width: box.width, height: box.height),
+        str.draw(with: NSRect(x: p.x - box.width / 2, y: p.y - box.height / 2, width: box.width, height: box.height),
                  options: [.usesLineFragmentOrigin, .usesFontLeading])
+    }
+
+    private static func thumbnail(_ url: URL, side: CGFloat) -> NSImage? {
+        guard let src = NSImage(contentsOf: url), src.size.width > 0, src.size.height > 0 else { return nil }
+        let out = NSImage(size: NSSize(width: side, height: side))
+        out.lockFocus()
+        let scale = side / min(src.size.width, src.size.height)
+        let w = src.size.width * scale, h = src.size.height * scale
+        src.draw(in: NSRect(x: (side - w) / 2, y: (side - h) / 2, width: w, height: h))
+        out.unlockFocus()
+        return out
     }
 
     // MARK: input
 
     override func mouseMoved(with e: NSEvent) {
-        let p = convert(e.locationInWindow, from: nil)
-        let idx = petalIndex(at: p)
-        if idx != hover { hover = idx; needsDisplay = true }
+        let i = petalIndex(at: convert(e.locationInWindow, from: nil))
+        if i != hover { hover = i; needsDisplay = true }
     }
-    override func mouseExited(with e: NSEvent) { if hover != nil { hover = nil; needsDisplay = true } }
+    override func mouseExited(with e: NSEvent) {
+        if hover != nil { hover = nil; needsDisplay = true }
+    }
 
     override func mouseDown(with e: NSEvent) {
-        let p = convert(e.locationInWindow, from: nil)
-        if let i = petalIndex(at: p), !running { focus = i; items[i].run() }
+        guard !running, let i = petalIndex(at: convert(e.locationInWindow, from: nil)) else { return }
+        focus = i
+        items[i].run()
     }
 
     override func keyDown(with e: NSEvent) {
         switch e.keyCode {
-        case 53:                                             // esc
+        case 53:                                 // esc
             if presetParent != nil { presetParent = nil; rebuild() } else { owner?.orderOut(nil) }
-        case 123, 126:                                       // ← / ↑  prev
-            step(-1)
-        case 124, 125:                                       // → / ↓  next
-            step(+1)
-        case 36, 76:                                         // return / enter
+        case 123, 126: step(-1)                   // ← ↑
+        case 124, 125: step(+1)                   // → ↓
+        case 36, 76:                             // return
             if !running, items.indices.contains(focus) { items[focus].run() }
-        case 48:                                             // tab
-            cycleMode()
+        case 48: cycleMode()                     // tab
         default:
-            if let ch = e.charactersIgnoringModifiers, ch == "v", e.modifierFlags.contains(.command) { pasteFiles() }
+            if e.charactersIgnoringModifiers == "v", e.modifierFlags.contains(.command) { paste() }
             else { super.keyDown(with: e) }
         }
     }
@@ -483,24 +498,57 @@ private final class WheelHUD: NSView {
 
     override func flagsChanged(with e: NSEvent) {
         let held = e.modifierFlags.contains(.option)
-        if held != optionHeld { optionHeld = held; presetParent = nil; rebuild() }
+        if held != optionHeld {
+            optionHeld = held
+            presetParent = nil
+            rebuild()
+        }
         super.flagsChanged(with: e)
     }
 
-    private func pasteFiles() {
-        let opts: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
-        if let urls = NSPasteboard.general.readObjects(forClasses: [NSURL.self], options: opts) as? [URL], !urls.isEmpty {
-            accept(urls)
+    private func paste() {
+        if let urls = Self.fileURLs(NSPasteboard.general), !urls.isEmpty { accept(urls) }
+    }
+
+    // MARK: drag
+
+    override func draggingEntered(_ s: NSDraggingInfo) -> NSDragOperation { .copy }
+
+    override func draggingUpdated(_ s: NSDraggingInfo) -> NSDragOperation {
+        let i = petalIndex(at: convert(s.draggingLocation, from: nil))
+        if i != hover { hover = i; needsDisplay = true }
+        return .copy
+    }
+
+    override func draggingExited(_ s: NSDraggingInfo?) {
+        if hover != nil { hover = nil; needsDisplay = true }
+    }
+
+    override func performDragOperation(_ s: NSDraggingInfo) -> Bool {
+        guard let urls = Self.fileURLs(s.draggingPasteboard), !urls.isEmpty else { return false }
+        dragSummoned = false
+        accept(urls)
+        if !running, let i = petalIndex(at: convert(s.draggingLocation, from: nil)) {
+            focus = i
+            items[i].run()
+        } else {
+            // Dropped on the disc, not a petal — leave it open and make it usable by keyboard.
+            window?.makeKeyAndOrderFront(nil)
+            window?.makeFirstResponder(self)
+        }
+        return true
+    }
+
+    override func draggingEnded(_ s: NSDraggingInfo) {
+        if dragSummoned {
+            dragSummoned = false
+            owner?.orderOut(nil)
         }
     }
 
-    override func draggingEntered(_ s: NSDraggingInfo) -> NSDragOperation { .copy }
-    override func performDragOperation(_ s: NSDraggingInfo) -> Bool {
-        let opts: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
-        guard let urls = s.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: opts) as? [URL],
-              !urls.isEmpty else { return false }
-        accept(urls)
-        return true
+    private static func fileURLs(_ pb: NSPasteboard) -> [URL]? {
+        pb.readObjects(forClasses: [NSURL.self],
+                       options: [.urlReadingFileURLsOnly: true]) as? [URL]
     }
 }
 
@@ -519,7 +567,7 @@ private extension Tool {
         }
     }
 
-    /// Short enough to sit inside a petal; `\n` splits the wide ones onto two lines.
+    /// Short label for a petal; `\n` breaks the wide ones onto two lines.
     var wheelLabel: String {
         switch self {
         case .resize:           return "RESIZE"

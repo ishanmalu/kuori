@@ -7,11 +7,14 @@ struct ProcessOutcome {
 }
 
 enum ProcessRun {
-    /// Run a binary to completion, capturing both streams. Blocking; call off
-    /// the main thread from the GUI.
+    /// Run a binary to completion and capture both streams. Blocking — keep it
+    /// off the main thread. A non-nil `timeout` kills the process (and returns
+    /// code 124) if it outlives it; a wedged engine shouldn't hang a conversion
+    /// forever.
     @discardableResult
-    static func run(_ launchPath: String, _ args: [String], cwd: URL? = nil,
-                    env: [String: String]? = nil) -> ProcessOutcome {
+    static func run(_ launchPath: String, _ args: [String],
+                    cwd: URL? = nil, env: [String: String]? = nil,
+                    timeout: TimeInterval? = nil) -> ProcessOutcome {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: launchPath)
         p.arguments = args
@@ -26,18 +29,14 @@ enum ProcessRun {
 
         let lock = NSLock()
         var outData = Data(), errData = Data()
-        let group = DispatchGroup()
+        let readers = DispatchGroup()
 
-        func drain(_ pipe: Pipe, _ append: @escaping (Data) -> Void) {
-            group.enter()
+        func drain(_ pipe: Pipe, into keep: @escaping (Data) -> Void) {
+            readers.enter()
             let h = pipe.fileHandleForReading
             DispatchQueue.global(qos: .userInitiated).async {
-                while true {
-                    let chunk = h.availableData
-                    if chunk.isEmpty { break }
-                    append(chunk)
-                }
-                group.leave()
+                while case let chunk = h.availableData, !chunk.isEmpty { keep(chunk) }
+                readers.leave()
             }
         }
         drain(outPipe) { d in lock.lock(); outData.append(d); lock.unlock() }
@@ -48,13 +47,22 @@ enum ProcessRun {
         } catch {
             return ProcessOutcome(code: -1, stdout: "", stderr: "launch failed: \(error.localizedDescription)")
         }
-        p.waitUntilExit()
-        group.wait()
+
+        var timedOut = false
+        if let timeout {
+            let deadline = DispatchWorkItem { timedOut = true; p.terminate() }
+            DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: deadline)
+            p.waitUntilExit()
+            deadline.cancel()
+        } else {
+            p.waitUntilExit()
+        }
+        readers.wait()
 
         return ProcessOutcome(
-            code: p.terminationStatus,
+            code: timedOut ? 124 : p.terminationStatus,
             stdout: String(decoding: outData, as: UTF8.self),
-            stderr: String(decoding: errData, as: UTF8.self)
+            stderr: timedOut ? "timed out after \(Int(timeout ?? 0))s" : String(decoding: errData, as: UTF8.self)
         )
     }
 }
