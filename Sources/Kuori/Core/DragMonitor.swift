@@ -23,16 +23,17 @@ final class DragMonitor {
     private func handle(_ e: NSEvent) {
         switch e.type {
         case .leftMouseDragged:
-            guard !summoning,
-                  NSEvent.modifierFlags.contains(.shift),
-                  let urls = draggedFiles() else { return }
+            // A background process can't read the drag pasteboard, so we can't
+            // tell yet whether files are being dragged. Show the wheel under the
+            // cursor; it reads the drag once it enters the window, and dismisses
+            // itself if nothing does.
+            guard !summoning, NSEvent.modifierFlags.contains(.shift) else { return }
             summoning = true
-            DropPanel.shared.beginDrop(urls: urls, at: NSEvent.mouseLocation)
+            DispatchQueue.main.async { DropPanel.shared.beginDrop(at: NSEvent.mouseLocation) }
 
         case .leftMouseUp:
             guard summoning else { return }
             summoning = false
-            // If the drop never reached the window, tidy up after AppKit has had its turn.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
                 DropPanel.shared.dismissIfDragSummoned()
             }
@@ -40,13 +41,5 @@ final class DragMonitor {
         default:
             break
         }
-    }
-
-    private func draggedFiles() -> [URL]? {
-        let pb = NSPasteboard(name: .drag)
-        let opts: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
-        guard let urls = pb.readObjects(forClasses: [NSURL.self], options: opts) as? [URL],
-              !urls.isEmpty else { return nil }
-        return urls
     }
 }

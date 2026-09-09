@@ -61,14 +61,23 @@ final class DropPanel: NSPanel {
         hud.accept(urls)
     }
 
-    /// From `DragMonitor`: a Shift-drag is in progress. Appear under the cursor
-    /// without taking focus, so the drag keeps running and can land on a petal.
-    func beginDrop(urls: [URL], at point: NSPoint) {
+    private var dragDismiss: DispatchWorkItem?
+
+    /// From `DragMonitor`: a Shift-drag is in progress somewhere. Appear under
+    /// the cursor without taking focus. The HUD reads the dragged files once the
+    /// drag enters it; if none does within a beat, we vanish.
+    func beginDrop(at point: NSPoint) {
         position(around: point)
-        hud.dragSummoned = true
+        hud.armForDrag()
         orderFront(nil)
-        hud.accept(urls)
+
+        dragDismiss?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.dismissIfDragSummoned() }
+        dragDismiss = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: work)
     }
+
+    func cancelDragDismiss() { dragDismiss?.cancel(); dragDismiss = nil }
 
     func dismissIfDragSummoned() {
         if hud.dragSummoned { hud.dragSummoned = false; orderOut(nil) }
@@ -151,6 +160,16 @@ private final class WheelHUD: NSView {
         running = false
         progress = 0
         rebuild()
+    }
+
+    /// Shown by `DragMonitor` before we know what's being dragged.
+    func armForDrag() {
+        dragSummoned = true
+        inputs = []
+        formats = []
+        thumb = nil
+        items = []
+        needsDisplay = true
     }
 
     fileprivate func forceMode(_ name: String) {
@@ -555,12 +574,24 @@ private final class WheelHUD: NSView {
 
     // MARK: drag
 
-    override func draggingEntered(_ s: NSDraggingInfo) -> NSDragOperation { .copy }
+    override func draggingEntered(_ s: NSDraggingInfo) -> NSDragOperation {
+        loadFromDrag(s)
+        return .copy
+    }
 
     override func draggingUpdated(_ s: NSDraggingInfo) -> NSDragOperation {
+        if inputs.isEmpty { loadFromDrag(s) }
         let i = petalIndex(at: convert(s.draggingLocation, from: nil))
         if i != hover { hover = i; needsDisplay = true }
         return .copy
+    }
+
+    /// The drag pasteboard is readable now that the drag is over our window —
+    /// which it wasn't from `DragMonitor`.
+    private func loadFromDrag(_ s: NSDraggingInfo) {
+        guard let urls = Self.fileURLs(s.draggingPasteboard), !urls.isEmpty else { return }
+        owner?.cancelDragDismiss()
+        accept(urls)
     }
 
     override func draggingExited(_ s: NSDraggingInfo?) {
@@ -569,6 +600,7 @@ private final class WheelHUD: NSView {
 
     override func performDragOperation(_ s: NSDraggingInfo) -> Bool {
         guard let urls = Self.fileURLs(s.draggingPasteboard), !urls.isEmpty else { return false }
+        owner?.cancelDragDismiss()
         dragSummoned = false
         accept(urls)
         if !running, let i = petalIndex(at: convert(s.draggingLocation, from: nil)) {
