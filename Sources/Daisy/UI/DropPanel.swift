@@ -97,6 +97,7 @@ final class DropPanel: NSPanel {
     /// layer of its own so it can overflow the disc — which is the whole reason
     /// the window is bigger than the wheel.
     private func playEntrance() {
+        hud.playEntrance()
         guard let content = contentView, let layer = content.layer else { return }
         alphaValue = 0
         layer.transform = CATransform3DMakeScale(0.90, 0.90, 1)
@@ -190,6 +191,28 @@ final class DropPanel: NSPanel {
         if hud.dragSummoned { hud.dragSummoned = false; orderOut(nil) }
     }
 
+    /// Fade and shrink out. `orderOut` on its own is a hard cut, which reads as
+    /// a glitch next to an entrance that takes half a second.
+    func dismiss() {
+        guard isVisible, !dismissing else { return }
+        dismissing = true
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.13
+            ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
+            ctx.allowsImplicitAnimation = true
+            animator().alphaValue = 0
+            contentView?.layer?.transform = CATransform3DMakeScale(0.94, 0.94, 1)
+        } completionHandler: { [weak self] in
+            guard let self else { return }
+            self.orderOut(nil)
+            self.alphaValue = 1
+            self.contentView?.layer?.transform = CATransform3DIdentity
+            self.dismissing = false
+        }
+    }
+
+    private var dismissing = false
+
     /// Menu-bar "Convert File…": the wheel plus Finder's picker in one step.
     func summonAndChoose() {
         showCentered()
@@ -231,6 +254,29 @@ private final class WheelHUD: NSView {
     private var errorText: String?
     private var errorClear: DispatchWorkItem?
 
+    // MARK: motion
+    //
+    // Nothing in the wheel animates itself — it is one drawn view. A display
+    // link advances every moving quantity once per frame and stops as soon as
+    // they all settle, so an idle wheel costs nothing.
+
+    private var link: CADisplayLink?
+    private var lastTick: CFTimeInterval = 0
+    /// Per-petal hover weight, 0…1. Indexed alongside `items`.
+    private var petalHeat: [Spring] = []
+    /// Eased stand-in for `progress`, so the arc sweeps instead of jumping.
+    private var shownProgress = Spring()
+    /// Warmth of the empty ring and of the close button under the cursor.
+    private var emptyHeat = Spring()
+    private var closeHeat = Spring()
+    /// The wheel unfurling on summon, and the flash when a job lands.
+    private var entrance = Clock(duration: 0.66)
+    private var success = Clock(duration: 0.72)
+    /// A drag is currently over the wheel: petals lean toward the cursor.
+    private var dragActive = false
+    private var dragPoint: CGPoint?
+    private var closeHover = false
+
     static let discDiameter: CGFloat = 286
 
     private var center: CGPoint { CGPoint(x: bounds.midX, y: bounds.midY) }
@@ -258,6 +304,73 @@ private final class WheelHUD: NSView {
         addTrackingArea(NSTrackingArea(rect: bounds,
                                        options: [.mouseMoved, .mouseEnteredAndExited, .activeAlways],
                                        owner: self))
+    }
+
+    // MARK: ticker
+
+    /// Wake the display link. Cheap to call repeatedly — it no-ops while running.
+    private func animate() {
+        guard link == nil else { return }
+        lastTick = CACurrentMediaTime()
+        let l = displayLink(target: self, selector: #selector(tick))
+        l.preferredFrameRateRange = CAFrameRateRange(minimum: 30, maximum: 120, preferred: 60)
+        l.add(to: .main, forMode: .common)
+        link = l
+    }
+
+    @objc private func tick() {
+        let now = CACurrentMediaTime()
+        // A dropped frame must not be integrated in one step, or the springs
+        // overshoot wildly on the frame after a stall.
+        let dt = CGFloat(min(1.0 / 30, max(1.0 / 240, now - lastTick)))
+        lastTick = now
+
+        while petalHeat.count < items.count { petalHeat.append(Spring()) }
+        if petalHeat.count > items.count { petalHeat.removeLast(petalHeat.count - items.count) }
+
+        let lit = hover ?? focus
+        for i in petalHeat.indices {
+            petalHeat[i].target = (i == lit && !items.isEmpty) ? 1 : 0
+            petalHeat[i].step(dt)
+        }
+        shownProgress.target = CGFloat(progress)
+        shownProgress.step(dt)
+        emptyHeat.target = hoveringEmpty ? 1 : 0
+        emptyHeat.step(dt)
+        closeHeat.target = closeHover ? 1 : 0
+        closeHeat.step(dt)
+
+        needsDisplay = true
+
+        // The empty ring's dashes turn continuously, so it is the one state
+        // that keeps the link alive on purpose. It is also the state you only
+        // ever see for a few seconds, with the panel deliberately on screen.
+        let idleBreathing = inputs.isEmpty && (window?.isVisible ?? false)
+        let springsSettled = petalHeat.allSatisfy(\.settled)
+            && shownProgress.settled && emptyHeat.settled && closeHeat.settled
+        if springsSettled && !entrance.running && !success.running && !idleBreathing {
+            link?.invalidate()
+            link = nil
+        }
+    }
+
+    /// Called by the panel as it comes on screen.
+    func playEntrance() {
+        entrance.start()
+        petalHeat.indices.forEach { petalHeat[$0].snap(to: 0) }
+        animate()
+    }
+
+    /// 0…1 for petal `i`, staggered so the wheel opens rather than pops.
+    private func petalAppear(_ i: Int) -> CGFloat {
+        guard let e = entrance.elapsed else { return 1 }
+        let stagger = 0.035 * Double(i)
+        return Ease.outBack(CGFloat((e - stagger) / 0.34), 1.35)
+    }
+
+    private var hubAppear: CGFloat {
+        guard let e = entrance.elapsed else { return 1 }
+        return Ease.outBack(CGFloat(e / 0.36), 1.7)
     }
 
     // MARK: contents
@@ -326,6 +439,10 @@ private final class WheelHUD: NSView {
 
     private func rebuild() {
         guard !inputs.isEmpty else { needsDisplay = true; return }
+        // A new set of petals unfurls the same way the first set did, which is
+        // what makes ⌥ and ⇥ read as the wheel changing rather than blinking.
+        entrance.start()
+        animate()
         switch mode {
         case .convert: items = convertItems()
         case .tools:   items = presetParent.map(presetItems) ?? toolItems()
@@ -456,13 +573,14 @@ private final class WheelHUD: NSView {
                 let (reveal, _) = try work(report)
                 DispatchQueue.main.async {
                     self?.progress = 1
-                    self?.needsDisplay = true
+                    self?.success.start()
+                    self?.animate()
                     if let reveal { NSWorkspace.shared.activateFileViewerSelecting([reveal]) }
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.85) {
                         guard let self else { return }
                         // Came from a drag → get out of the way. Opened deliberately
                         // (hotkey, or clicked into) → stay, cleared, ready for the next file.
-                        if self.window?.isKeyWindow != true { self.owner?.orderOut(nil) }
+                        if self.window?.isKeyWindow != true { self.owner?.dismiss() }
                         self.resetIdle()
                     }
                 }
@@ -493,8 +611,13 @@ private final class WheelHUD: NSView {
         CGPoint(x: center.x + cos(a) * r, y: center.y + sin(a) * r)
     }
 
-    private func petalPath(_ i: Int) -> NSBezierPath {
+    /// `rIn`/`rOut` default to the resting ring but are driven while animating —
+    /// the entrance grows a petal outward from the hub, and hover pushes its
+    /// tip a few points further out.
+    private func petalPath(_ i: Int, rIn: CGFloat? = nil, rOut: CGFloat? = nil) -> NSBezierPath {
         let a = angle(i), ha = petalHalfAngle
+        let innerR = rIn ?? self.innerR
+        let outerR = rOut ?? self.outerR
         let pts = [
             polar(innerR, a - ha), polar(innerR, a), polar(innerR, a + ha),
             polar(outerR, a + ha), polar(outerR, a), polar(outerR, a - ha),
@@ -507,6 +630,15 @@ private final class WheelHUD: NSView {
         }
         path.close()
         return path
+    }
+
+    /// The close button, sat in the margin off the disc's top-right shoulder.
+    /// Outside the glass rather than on it: anywhere inside the rim it would
+    /// land on a petal, and the margin already exists for the bloom and shadow.
+    private var closeRect: NSRect {
+        let r: CGFloat = 13
+        let c = polar(discR + 14, .pi / 4)
+        return NSRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2)
     }
 
     private func petalIndex(at p: CGPoint) -> Int? {
@@ -537,16 +669,21 @@ private final class WheelHUD: NSView {
             Theme.glassTint.setFill()
             disc.fill()
             drawRim()
-            let dashed = NSBezierPath(ovalIn: discRect.insetBy(dx: 9, dy: 9))
-            dashed.lineWidth = 1.5
-            dashed.setLineDash([6, 6], count: 2, phase: 0)
-            Theme.accent.withAlphaComponent(hoveringEmpty ? 0.75 : 0.42).setStroke()
+            let heat = Ease.clamp(emptyHeat.value)
+            // The dash pattern rotates slowly, so an empty wheel looks like it
+            // is waiting for something rather than sitting inert.
+            let phase = CGFloat(CACurrentMediaTime().truncatingRemainder(dividingBy: 4) / 4) * 12
+            let dashed = NSBezierPath(ovalIn: discRect.insetBy(dx: 9 - heat * 2, dy: 9 - heat * 2))
+            dashed.lineWidth = 1.5 + heat * 0.6
+            dashed.setLineDash([6, 6], count: 2, phase: phase)
+            Theme.accent.withAlphaComponent(0.42 + 0.33 * heat).setStroke()
             dashed.stroke()
             text("Drop files", at: CGPoint(x: center.x, y: center.y + 16), 14, .semibold, Theme.ink)
             text("or click to choose", at: CGPoint(x: center.x, y: center.y - 3),
                  11, .regular, Theme.inkFaint)
             text("⌥ tools   ⇥ mode   esc", at: CGPoint(x: center.x, y: center.y - 30),
                  9, .regular, Theme.inkFaint, tracking: 0.3)
+            drawCloseButton()
             return
         }
 
@@ -560,7 +697,116 @@ private final class WheelHUD: NSView {
         } else {
             for i in items.indices { drawPetal(i) }
         }
+        drawDragFlow()
+        drawDragCursor()
+        drawProgressArc()
+        drawSuccessPulse()
         if let errorText { drawToast(errorText) } else { drawHub() }
+        drawCloseButton()
+    }
+
+    /// While a file is dragged onto a petal, three dots march from the hub out
+    /// along that petal — the file visibly heading somewhere.
+    ///
+    /// Drawn over the petal in `onAccent`, not under it and not in the accent:
+    /// under the petals the whole path is hidden behind them, and accent on a
+    /// lit petal is accent on accent.
+    private func drawDragFlow() {
+        guard dragActive, let i = hover, items.indices.contains(i) else { return }
+        let a = angle(i)
+        let from = hubR + 10, to = outerR - 16
+        guard to > from else { return }
+
+        let cycle = CACurrentMediaTime().truncatingRemainder(dividingBy: 0.75) / 0.75
+        for k in 0..<3 {
+            var t = CGFloat(cycle) + CGFloat(k) / 3
+            if t > 1 { t -= 1 }
+            let p = polar(from + (to - from) * t, a)
+            // Fade in off the hub and out at the tip so they arrive rather than
+            // blink out of existence.
+            let fade = min(1, t / 0.2) * min(1, (1 - t) / 0.25)
+            let r = 2.8 - 0.8 * t
+            Theme.onAccent.withAlphaComponent(0.55 * fade).setFill()
+            NSBezierPath(ovalIn: NSRect(x: p.x - r, y: p.y - r,
+                                        width: r * 2, height: r * 2)).fill()
+        }
+    }
+
+    /// The target ring, drawn after the petals — over a lit petal it has to
+    /// invert, because accent on accent is nothing at all.
+    private func drawDragCursor() {
+        guard dragActive, let p = dragPoint else { return }
+        let locked = hover != nil
+        let ink = locked ? Theme.onAccent : Theme.accent
+        let r: CGFloat = locked ? 9 : 13
+        let ring = NSBezierPath(ovalIn: NSRect(x: p.x - r, y: p.y - r, width: r * 2, height: r * 2))
+        ring.lineWidth = locked ? 2 : 1.2
+        ink.withAlphaComponent(locked ? 0.95 : 0.45).setStroke()
+        ring.stroke()
+        if locked {
+            ink.withAlphaComponent(0.9).setFill()
+            let dot: CGFloat = 2.6
+            NSBezierPath(ovalIn: NSRect(x: p.x - dot, y: p.y - dot,
+                                        width: dot * 2, height: dot * 2)).fill()
+        }
+    }
+
+    /// A sweep around the rim while a job runs. Reads at a glance from across
+    /// the screen in a way the percentage in the hub does not.
+    private func drawProgressArc() {
+        let p = Ease.clamp(shownProgress.value)
+        guard running || p > 0.001 else { return }
+        let arc = NSBezierPath()
+        arc.appendArc(withCenter: center, radius: discR - 4.5,
+                      startAngle: 90, endAngle: 90 - 360 * Double(p), clockwise: true)
+        arc.lineWidth = 3
+        arc.lineCapStyle = .round
+        NSGraphicsContext.saveGraphicsState()
+        let glow = NSShadow()
+        glow.shadowColor = Theme.accent.withAlphaComponent(0.6)
+        glow.shadowBlurRadius = 8
+        glow.shadowOffset = .zero
+        glow.set()
+        Theme.accent.setStroke()
+        arc.stroke()
+        NSGraphicsContext.restoreGraphicsState()
+    }
+
+    /// One ring thrown off the rim when a job lands — the visual receipt.
+    private func drawSuccessPulse() {
+        guard let t = success.progress, success.running else { return }
+        let e = Ease.out(t)
+        let ring = NSBezierPath(ovalIn: discRect.insetBy(dx: -e * 26, dy: -e * 26))
+        ring.lineWidth = 3 * (1 - e) + 0.5
+        Theme.accent.withAlphaComponent(0.75 * (1 - e)).setStroke()
+        ring.stroke()
+    }
+
+    /// Fades in with the wheel and warms under the cursor. Deliberately quiet:
+    /// esc already closes, so this is for people who reach for the mouse.
+    private func drawCloseButton() {
+        let appear = hubAppear
+        guard appear > 0.05 else { return }
+        let heat = Ease.clamp(closeHeat.value)
+        let box = closeRect.insetBy(dx: (1 - appear) * 5, dy: (1 - appear) * 5)
+        let circle = NSBezierPath(ovalIn: box)
+
+        Theme.glassTint.withAlphaComponent(0.55 + 0.35 * heat + 0.25 * appear).setFill()
+        circle.fill()
+        Theme.specular.withAlphaComponent(Theme.specular.alphaComponent * (0.5 + 0.5 * heat)).setStroke()
+        circle.lineWidth = 1
+        circle.stroke()
+
+        let arm = box.width * (0.21 + 0.02 * heat)
+        let c = CGPoint(x: box.midX, y: box.midY)
+        let x = NSBezierPath()
+        x.move(to: CGPoint(x: c.x - arm, y: c.y - arm)); x.line(to: CGPoint(x: c.x + arm, y: c.y + arm))
+        x.move(to: CGPoint(x: c.x - arm, y: c.y + arm)); x.line(to: CGPoint(x: c.x + arm, y: c.y - arm))
+        x.lineWidth = 1.6
+        x.lineCapStyle = .round
+        (heat > 0.5 ? Theme.accent : Theme.ink)
+            .withAlphaComponent((0.55 + 0.45 * heat) * appear).setStroke()
+        x.stroke()
     }
 
     /// What sells the glass: a bright arc along the top of the curve fading to a
@@ -613,35 +859,56 @@ private final class WheelHUD: NSView {
 
 
     private func drawPetal(_ i: Int) {
-        let active = (hover ?? focus) == i
-        let petal = petalPath(i)
-        let fg: NSColor
+        let appear = petalAppear(i)
+        guard appear > 0.001 else { return }
 
-        if active {
+        let heat = petalHeat.indices.contains(i) ? Ease.clamp(petalHeat[i].value) : 0
+        // Hover pushes the tip outward; a drag pushes it further, so the wheel
+        // visibly reaches for the file.
+        let reach = heat * (dragActive ? 9 : 5)
+        let rIn = innerR - heat * 2
+        // Clamped: the rim is at discR and a reaching tip must not break out of
+        // the glass it is cut from.
+        let rOut = min(discR - 9, innerR + (outerR - innerR) * appear + reach)
+        let petal = petalPath(i, rIn: rIn, rOut: rOut)
+
+        NSGraphicsContext.saveGraphicsState()
+        if appear < 1 { petal.addClip() }   // keeps the label inside a growing petal
+
+        if heat > 0.01 {
+            // Rest colour underneath, accent faded in over it, so the transition
+            // is a warm-up rather than a swap.
+            Theme.petalRest.setFill()
+            petal.fill()
             NSGraphicsContext.saveGraphicsState()
             let glow = NSShadow()
-            glow.shadowColor = Theme.accent.withAlphaComponent(0.55)
-            glow.shadowBlurRadius = 16
+            glow.shadowColor = Theme.accent.withAlphaComponent(0.55 * heat)
+            glow.shadowBlurRadius = 10 + 10 * heat
             glow.shadowOffset = .zero
             glow.set()
-            Theme.accent.setFill()
+            Theme.accent.withAlphaComponent(heat).setFill()
             petal.fill()
             NSGraphicsContext.restoreGraphicsState()
-            if running { Theme.accent.withAlphaComponent(0.35).setFill(); petal.fill() }
-            fg = Theme.onAccent
+            if running { Theme.accent.withAlphaComponent(0.35 * heat).setFill(); petal.fill() }
         } else {
             Theme.petalRest.setFill()
             petal.fill()
-            // Each petal gets its own thin lit edge, so the whole wheel looks
-            // cut from one sheet of glass rather than printed on the disc.
-            Theme.specular.withAlphaComponent(Theme.specular.alphaComponent * 0.45).setStroke()
-            petal.lineWidth = 1
-            petal.stroke()
-            fg = Theme.onPetal
         }
+        // Each petal gets its own thin lit edge, so the whole wheel looks
+        // cut from one sheet of glass rather than printed on the disc.
+        Theme.specular.withAlphaComponent(Theme.specular.alphaComponent * 0.45).setStroke()
+        petal.lineWidth = 1
+        petal.stroke()
+        NSGraphicsContext.restoreGraphicsState()
+
+        // Label fades up late, once the petal is most of the way out.
+        let textAlpha = Ease.clamp((appear - 0.45) / 0.4)
+        guard textAlpha > 0.01 else { return }
+        let fg = (heat > 0.5 ? Theme.onAccent : Theme.onPetal)
+            .withAlphaComponent(textAlpha)
 
         let item = items[i]
-        let p = polar(midR + 5, angle(i))
+        let p = polar((rIn + rOut) / 2 + 5, angle(i))
         var labelY = p.y
         if let name = item.symbol,
            let icon = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
@@ -649,7 +916,7 @@ private final class WheelHUD: NSView {
             icon.isTemplate = true
             fg.set()
             icon.draw(in: NSRect(x: p.x - 7, y: p.y + 4, width: 14, height: 14),
-                      from: .zero, operation: .sourceOver, fraction: 1,
+                      from: .zero, operation: .sourceOver, fraction: textAlpha,
                       respectFlipped: true, hints: [.interpolation: NSImageInterpolation.high])
             labelY = p.y - 10
         }
@@ -692,7 +959,7 @@ private final class WheelHUD: NSView {
         hub.lineWidth = 1
         hub.stroke()
 
-        let pill = running ? "\(Int(progress * 100))%"
+        let pill = running ? "\(Int(Ease.clamp(shownProgress.value) * 100))%"
             : presetParent.map { $0.label.uppercased() } ?? (focusTitle() ?? "")
         guard !pill.isEmpty else { return }
         let width = (pill as NSString).size(withAttributes: [.font: NSFont.systemFont(ofSize: 11, weight: .semibold)]).width + 18
@@ -761,21 +1028,32 @@ private final class WheelHUD: NSView {
             // by warming the dashed edge.
             let inside = hypot(p.x - center.x, p.y - center.y) <= discR
             (inside ? NSCursor.pointingHand : NSCursor.arrow).set()
-            if inside != hoveringEmpty { hoveringEmpty = inside; needsDisplay = true }
+            if inside != hoveringEmpty { hoveringEmpty = inside; animate() }
             return
         }
-        if hoveringEmpty { hoveringEmpty = false }
+        if hoveringEmpty { hoveringEmpty = false; animate() }
+
+        let overClose = closeRect.contains(p)
+        if overClose != closeHover { closeHover = overClose; animate() }
+
         let i = petalIndex(at: p)
-        if i != hover { hover = i; needsDisplay = true }
+        if i != hover { hover = i; animate() }
+        (overClose || i != nil ? NSCursor.pointingHand : NSCursor.arrow).set()
     }
     override func mouseExited(with e: NSEvent) {
         NSCursor.arrow.set()
-        if hover != nil || hoveringEmpty { hover = nil; hoveringEmpty = false; needsDisplay = true }
+        if hover != nil || hoveringEmpty || closeHover {
+            hover = nil; hoveringEmpty = false; closeHover = false
+            animate()
+        }
     }
 
     override func mouseDown(with e: NSEvent) {
-        guard !running else { return }
         let p = convert(e.locationInWindow, from: nil)
+        // The close button works even mid-conversion — the job keeps running,
+        // the wheel just gets out of the way.
+        if closeRect.contains(p) { owner?.dismiss(); return }
+        guard !running else { return }
         if inputs.isEmpty {
             if hypot(p.x - center.x, p.y - center.y) <= discR { chooseFiles() }
             return
@@ -818,7 +1096,7 @@ private final class WheelHUD: NSView {
     override func keyDown(with e: NSEvent) {
         switch e.keyCode {
         case 53:                                 // esc
-            if presetParent != nil { presetParent = nil; rebuild() } else { owner?.orderOut(nil) }
+            if presetParent != nil { presetParent = nil; rebuild() } else { owner?.dismiss() }
         case 123, 126: step(-1)                   // ← ↑
         case 124, 125: step(+1)                   // → ↓
         case 36, 76, 49:                         // return, space
@@ -837,7 +1115,8 @@ private final class WheelHUD: NSView {
     private func step(_ d: Int) {
         guard !items.isEmpty else { return }
         focus = (focus + d + items.count) % items.count
-        needsDisplay = true
+        hover = nil          // keyboard takes over from the mouse
+        animate()
     }
 
     override func flagsChanged(with e: NSEvent) {
@@ -857,14 +1136,23 @@ private final class WheelHUD: NSView {
     // MARK: drag
 
     override func draggingEntered(_ s: NSDraggingInfo) -> NSDragOperation {
+        dragActive = true
+        dragPoint = convert(s.draggingLocation, from: nil)
         loadFromDrag(s)
+        animate()
         return .copy
     }
 
     override func draggingUpdated(_ s: NSDraggingInfo) -> NSDragOperation {
         if inputs.isEmpty { loadFromDrag(s) }
-        let i = petalIndex(at: convert(s.draggingLocation, from: nil))
-        if i != hover { hover = i; needsDisplay = true }
+        let p = convert(s.draggingLocation, from: nil)
+        dragPoint = p
+        dragActive = true
+        let i = petalIndex(at: p)
+        if i != hover { hover = i }
+        // The cursor moves every frame, so the tether has to redraw every frame.
+        needsDisplay = true
+        animate()
         return .copy
     }
 
@@ -877,10 +1165,15 @@ private final class WheelHUD: NSView {
     }
 
     override func draggingExited(_ s: NSDraggingInfo?) {
-        if hover != nil { hover = nil; needsDisplay = true }
+        dragActive = false
+        dragPoint = nil
+        hover = nil
+        animate()
     }
 
     override func performDragOperation(_ s: NSDraggingInfo) -> Bool {
+        dragActive = false
+        dragPoint = nil
         guard let urls = Self.fileURLs(s.draggingPasteboard), !urls.isEmpty else { return false }
         owner?.cancelDragDismiss()
         dragSummoned = false

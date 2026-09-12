@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.7.0
+
+- **Menu-bar icon is a five-petal daisy.** The eight-petal app mark closes into
+  a cog at 18pt; five petals around a punched centre still read as a flower.
+- **The wheel unfurls.** Petals grow outward from the hub on a 35ms stagger with
+  a slight overshoot, labels fading up behind them, the hub popping first. The
+  same unfurl replays on ⌥ and ⇥, so a mode change reads as the wheel turning
+  over rather than blinking.
+- **Close button** on the disc's top-right shoulder — in the margin rather than
+  on the glass, where it would sit on a petal. Works mid-conversion: the job
+  carries on, the wheel gets out of the way. `esc` still does the same thing.
+- **Everything eases now.** Hover, focus and progress are spring-driven instead
+  of switching instantly; a petal warms up and reaches outward under the cursor;
+  a sweep runs the rim while a job converts and throws one ring off it when the
+  job lands; the empty ring's dashes turn slowly so it looks like it is waiting.
+  Closing fades and shrinks instead of cutting to nothing.
+- **Drag feedback.** The targeted petal reaches further toward the cursor, three
+  dots march from the hub out along it, and the cursor carries a ring that
+  tightens and inverts once it locks on.
+- All of it runs off one display link that stops the moment the springs settle,
+  so an idle wheel costs nothing.
+- Fix: `build-app.sh` used `-Xswiftc -target` for its two single-arch builds. The
+  Swift Build backend keeps its own host target and appends that one, so the
+  link step got two conflicting targets and died. It uses `--arch` now.
+
 ## 0.6.1
 
 - **The wheel blooms open.** A ring of accent light flares past the rim and

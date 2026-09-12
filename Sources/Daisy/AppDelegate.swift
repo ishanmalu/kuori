@@ -45,17 +45,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// The flower reduced to a monochrome template, so the menu bar tints it for
-    /// light and dark automatically. Solid petals rather than outlines — at 18pt
-    /// a stroked petal closes up into a blob.
+    /// light and dark automatically. Five petals rather than the app icon's
+    /// eight: at 18pt the eight-petal version closes into a cog, and the centre
+    /// is punched out rather than drawn so the shape still reads as a flower.
     private static func menuBarIcon() -> NSImage {
         let d: CGFloat = 18
         let img = NSImage(size: NSSize(width: d, height: d))
         img.lockFocus()
         let c = CGPoint(x: d / 2, y: d / 2)
-        let petals = 8
+        let petals = 5
         let step = (CGFloat.pi * 2) / CGFloat(petals)
-        let petalR = d * 0.145            // radius of one round petal
-        let ring = d * 0.275              // distance from centre to petal centre
+        let petalR = d * 0.185            // radius of one round petal
+        let ring = d * 0.255              // centre of the flower to centre of a petal
 
         NSColor.black.setFill()
         for i in 0..<petals {
@@ -64,9 +65,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             NSBezierPath(ovalIn: CGRect(x: p.x - petalR, y: p.y - petalR,
                                         width: petalR * 2, height: petalR * 2)).fill()
         }
-        // The centre is punched out rather than drawn, so the template reads as a
-        // flower at 18pt instead of a filled circle.
-        let hubR = d * 0.135
+        let hubR = d * 0.155
         let hub = NSBezierPath(ovalIn: CGRect(x: c.x - hubR, y: c.y - hubR,
                                               width: hubR * 2, height: hubR * 2))
         NSGraphicsContext.current?.compositingOperation = .clear

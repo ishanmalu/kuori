@@ -25,15 +25,17 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
 if [ "$UNIVERSAL" -eq 1 ]; then
   echo "==> Building release binary (universal)"
-  swift build -c release --scratch-path .build/arm64 -Xswiftc -target -Xswiftc arm64-apple-macos14.0
-  swift build -c release --scratch-path .build/x86_64 -Xswiftc -target -Xswiftc x86_64-apple-macos14.0
+  # --arch, not -Xswiftc -target: the Swift Build backend keeps its own host
+  # target and appends ours, so the two disagree and the link step dies.
+  swift build -c release --scratch-path .build/arm64 --arch arm64
+  swift build -c release --scratch-path .build/x86_64 --arch x86_64
   lipo -create -output "$APP/Contents/MacOS/Daisy" \
     .build/arm64/release/Daisy .build/x86_64/release/Daisy
   lipo -archs "$APP/Contents/MacOS/Daisy"
 else
   ARCH="$(uname -m)"
   echo "==> Building release binary ($ARCH)"
-  swift build -c release --scratch-path .build/rel -Xswiftc -target -Xswiftc "${ARCH}-apple-macos14.0"
+  swift build -c release --scratch-path .build/rel --arch "$ARCH"
   cp ".build/rel/release/Daisy" "$APP/Contents/MacOS/Daisy"
 fi
 
