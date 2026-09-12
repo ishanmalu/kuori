@@ -99,37 +99,47 @@ final class DropPanel: NSPanel {
     private func playEntrance() {
         hud.playEntrance()
         guard let content = contentView, let layer = content.layer else { return }
-        alphaValue = 0
-        layer.transform = CATransform3DMakeScale(0.90, 0.90, 1)
 
+        // The disc never changes shape while it opens. A window shadow is
+        // derived from the content's shape and does not track a shape that is
+        // still moving, so a growing or scaling disc drags a hard ring of stale
+        // shadow around outside itself for the whole animation. Fading the
+        // window brings the shadow up with it; the arrival is carried by what
+        // happens inside the glass.
+        alphaValue = 0
+        NSAnimationContext.runAnimationGroup { ctx in
+            ctx.duration = 0.10
+            ctx.allowsImplicitAnimation = true
+            animator().alphaValue = 1
+        }
+
+        playBloom(on: layer, in: content.bounds)
+    }
+
+    /// A quick catch of light around the rim as the flower opens. Small and
+    /// brief on purpose: it hugs the edge rather than throwing a halo across
+    /// the desktop, and it is gone before the petals finish landing.
+    private func playBloom(on layer: CALayer, in bounds: CGRect) {
+        let r = WheelHUD.discDiameter / 2 + 17
         let bloom = CALayer()
-        let r = WheelHUD.discDiameter / 2 + 58
-        bloom.frame = CGRect(x: content.bounds.midX - r, y: content.bounds.midY - r,
-                             width: r * 2, height: r * 2)
+        bloom.frame = CGRect(x: bounds.midX - r, y: bounds.midY - r, width: r * 2, height: r * 2)
         bloom.contents = Self.bloomImage(diameter: r * 2)
         bloom.opacity = 0
-        layer.addSublayer(bloom)
 
+        let life = 0.26
         let flare = CAKeyframeAnimation(keyPath: "opacity")
-        flare.values = [0, 0.85, 0]
-        flare.keyTimes = [0, 0.28, 1]
-        flare.duration = 0.62
+        flare.values = [0, 0.5, 0]
+        flare.keyTimes = [0, 0.30, 1]
+        flare.duration = life
         let spread = CABasicAnimation(keyPath: "transform.scale")
-        spread.fromValue = 0.72
-        spread.toValue = 1.18
-        spread.duration = 0.62
+        spread.fromValue = 0.92
+        spread.toValue = 1.05
+        spread.duration = life
         spread.timingFunction = CAMediaTimingFunction(name: .easeOut)
         bloom.add(flare, forKey: "flare")
         bloom.add(spread, forKey: "spread")
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.62) { bloom.removeFromSuperlayer() }
-
-        NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = 0.20
-            ctx.timingFunction = CAMediaTimingFunction(controlPoints: 0.16, 1.1, 0.3, 1)
-            ctx.allowsImplicitAnimation = true
-            animator().alphaValue = 1
-            layer.transform = CATransform3DIdentity
-        }
+        layer.addSublayer(bloom)
+        DispatchQueue.main.asyncAfter(deadline: .now() + life) { bloom.removeFromSuperlayer() }
     }
 
     /// The bloom is a ring, not a filled circle. The disc is opaque, so a glow
@@ -142,11 +152,11 @@ final class DropPanel: NSPanel {
         let rimStop = (WheelHUD.discDiameter / 2) / (d / 2)
         let image = NSImage(size: NSSize(width: d, height: d), flipped: false) { rect in
             let mid = CGPoint(x: rect.midX, y: rect.midY)
-            NSGradient(colors: [Theme.accent.withAlphaComponent(0.30),
-                                Theme.accent.withAlphaComponent(0.45),
-                                Theme.accent.withAlphaComponent(0.95),
+            NSGradient(colors: [Theme.accent.withAlphaComponent(0),
+                                Theme.accent.withAlphaComponent(0.25),
+                                Theme.accent.withAlphaComponent(0.85),
                                 Theme.accent.withAlphaComponent(0)],
-                       atLocations: [0, rimStop - 0.22, rimStop, 1],
+                       atLocations: [0, rimStop - 0.08, rimStop, 1],
                        colorSpace: .sRGB)?
                 .draw(fromCenter: mid, radius: 0, toCenter: mid, radius: rect.width / 2,
                       options: [])
@@ -201,12 +211,10 @@ final class DropPanel: NSPanel {
             ctx.timingFunction = CAMediaTimingFunction(name: .easeIn)
             ctx.allowsImplicitAnimation = true
             animator().alphaValue = 0
-            contentView?.layer?.transform = CATransform3DMakeScale(0.94, 0.94, 1)
         } completionHandler: { [weak self] in
             guard let self else { return }
             self.orderOut(nil)
             self.alphaValue = 1
-            self.contentView?.layer?.transform = CATransform3DIdentity
             self.dismissing = false
         }
     }
@@ -270,7 +278,7 @@ private final class WheelHUD: NSView {
     private var emptyHeat = Spring()
     private var closeHeat = Spring()
     /// The wheel unfurling on summon, and the flash when a job lands.
-    private var entrance = Clock(duration: 0.66)
+    private var entrance = Clock(duration: 0.78)
     private var success = Clock(duration: 0.72)
     /// A drag is currently over the wheel: petals lean toward the cursor.
     private var dragActive = false
@@ -361,16 +369,40 @@ private final class WheelHUD: NSView {
         animate()
     }
 
-    /// 0…1 for petal `i`, staggered so the wheel opens rather than pops.
-    private func petalAppear(_ i: Int) -> CGFloat {
-        guard let e = entrance.elapsed else { return 1 }
-        let stagger = 0.035 * Double(i)
-        return Ease.outBack(CGFloat((e - stagger) / 0.34), 1.35)
+    /// The opening is a bloom, and the order matters: the glass arrives first
+    /// so there is something for the flower to sit on, the centre pops out of
+    /// it, and the petals swing open last. The phases overlap heavily — played
+    /// in sequence this reads as three animations rather than one.
+
+    /// Normalised time into a phase starting at `at`, lasting `over`.
+    private func phase(_ at: Double, _ over: Double) -> CGFloat? {
+        guard let e = entrance.elapsed else { return nil }
+        return CGFloat((e - at) / over)
+    }
+
+    /// The glass fading up. Quick — it is the stage, not the performance.
+    private var discAppear: CGFloat {
+        guard let t = phase(0, 0.20) else { return 1 }
+        return Ease.out(t)
     }
 
     private var hubAppear: CGFloat {
-        guard let e = entrance.elapsed else { return 1 }
-        return Ease.outBack(CGFloat(e / 0.36), 1.7)
+        guard let t = phase(0.06, 0.34) else { return 1 }
+        return Ease.outBack(t, 1.9)
+    }
+
+    /// 0…1 for petal `i`. A tight stagger: wide enough to read as a sweep
+    /// around the wheel, close enough that they are all in the air at once.
+    private func petalAppear(_ i: Int) -> CGFloat {
+        guard let t = phase(0.11 + 0.019 * Double(i), 0.38) else { return 1 }
+        return Ease.outBack(t, 1.25)
+    }
+
+    /// Each petal turns into place as it grows, all the same way, so the wheel
+    /// unwinds instead of the petals merely getting longer.
+    private func petalSwing(_ i: Int) -> CGFloat {
+        guard let t = phase(0.11 + 0.019 * Double(i), 0.44) else { return 0 }
+        return (1 - Ease.out(t)) * 0.20
     }
 
     // MARK: contents
@@ -614,8 +646,9 @@ private final class WheelHUD: NSView {
     /// `rIn`/`rOut` default to the resting ring but are driven while animating —
     /// the entrance grows a petal outward from the hub, and hover pushes its
     /// tip a few points further out.
-    private func petalPath(_ i: Int, rIn: CGFloat? = nil, rOut: CGFloat? = nil) -> NSBezierPath {
-        let a = angle(i), ha = petalHalfAngle
+    private func petalPath(_ i: Int, rIn: CGFloat? = nil, rOut: CGFloat? = nil,
+                           turn: CGFloat = 0) -> NSBezierPath {
+        let a = angle(i) + turn, ha = petalHalfAngle
         let innerR = rIn ?? self.innerR
         let outerR = rOut ?? self.outerR
         let pts = [
@@ -666,9 +699,10 @@ private final class WheelHUD: NSView {
         let disc = NSBezierPath(ovalIn: discRect)
 
         guard !inputs.isEmpty else {
-            Theme.glassTint.setFill()
+            let arrive = discAppear
+            Theme.glassTint.withAlphaComponent(Theme.glassTint.alphaComponent * arrive).setFill()
             disc.fill()
-            drawRim()
+            drawRim(arrive)
             let heat = Ease.clamp(emptyHeat.value)
             // The dash pattern rotates slowly, so an empty wheel looks like it
             // is waiting for something rather than sitting inert.
@@ -687,9 +721,12 @@ private final class WheelHUD: NSView {
             return
         }
 
-        Theme.glassTint.setFill()
+        // The glass fades up before anything sits on it, so the wheel has a
+        // stage to arrive on instead of materialising all at once.
+        let arrive = discAppear
+        Theme.glassTint.withAlphaComponent(Theme.glassTint.alphaComponent * arrive).setFill()
         disc.fill()
-        drawRim()
+        drawRim(arrive)
 
         if items.isEmpty {
             text("no route for", at: CGPoint(x: center.x, y: center.y + 8), 12, .medium, Theme.ink)
@@ -813,12 +850,13 @@ private final class WheelHUD: NSView {
     /// dark one underneath, so the edge reads as a lit bevel rather than a line.
     /// Drawn as two half-circle strokes rather than a gradient stroke, which
     /// AppKit can't do directly.
-    private func drawRim() {
+    private func drawRim(_ fade: CGFloat = 1) {
+        guard fade > 0.01 else { return }
         let inset = discRect.insetBy(dx: 0.75, dy: 0.75)
 
         for (from, to, colour, width) in [
-            (20.0, 160.0, Theme.specular, 1.6),      // lit top
-            (200.0, 340.0, Theme.glassEdge, 1.3),    // shaded underside
+            (20.0, 160.0, Theme.specular.withAlphaComponent(Theme.specular.alphaComponent * fade), 1.6),
+            (200.0, 340.0, Theme.glassEdge.withAlphaComponent(Theme.glassEdge.alphaComponent * fade), 1.3),
         ] {
             let arc = NSBezierPath()
             arc.appendArc(withCenter: CGPoint(x: inset.midX, y: inset.midY),
@@ -833,7 +871,7 @@ private final class WheelHUD: NSView {
         // arcs don't meet.
         let ring = NSBezierPath(ovalIn: inset)
         ring.lineWidth = 1
-        Theme.hairline.withAlphaComponent(0.10).setStroke()
+        Theme.hairline.withAlphaComponent(0.10 * fade).setStroke()
         ring.stroke()
     }
 
@@ -870,7 +908,8 @@ private final class WheelHUD: NSView {
         // Clamped: the rim is at discR and a reaching tip must not break out of
         // the glass it is cut from.
         let rOut = min(discR - 9, innerR + (outerR - innerR) * appear + reach)
-        let petal = petalPath(i, rIn: rIn, rOut: rOut)
+        let turn = petalSwing(i)
+        let petal = petalPath(i, rIn: rIn, rOut: rOut, turn: turn)
 
         NSGraphicsContext.saveGraphicsState()
         if appear < 1 { petal.addClip() }   // keeps the label inside a growing petal
@@ -899,16 +938,19 @@ private final class WheelHUD: NSView {
         Theme.specular.withAlphaComponent(Theme.specular.alphaComponent * 0.45).setStroke()
         petal.lineWidth = 1
         petal.stroke()
-        NSGraphicsContext.restoreGraphicsState()
+
+        // The clip is still on: a label must never ghost outside the petal it
+        // belongs to while that petal is still growing.
+        defer { NSGraphicsContext.restoreGraphicsState() }
 
         // Label fades up late, once the petal is most of the way out.
-        let textAlpha = Ease.clamp((appear - 0.45) / 0.4)
+        let textAlpha = Ease.clamp((appear - 0.55) / 0.35)
         guard textAlpha > 0.01 else { return }
         let fg = (heat > 0.5 ? Theme.onAccent : Theme.onPetal)
             .withAlphaComponent(textAlpha)
 
         let item = items[i]
-        let p = polar((rIn + rOut) / 2 + 5, angle(i))
+        let p = polar((rIn + rOut) / 2 + 5, angle(i) + turn)
         var labelY = p.y
         if let name = item.symbol,
            let icon = NSImage(systemSymbolName: name, accessibilityDescription: nil)?

@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.7.1
+
+- **Fixed the ring that cut around the wheel while it opened.** A window's drop
+  shadow is derived from the shape of its content and is not recomputed while
+  that shape is still moving, so growing or scaling the disc left a hard ring of
+  stale shadow hanging outside it for the whole animation — and
+  `invalidateShadow()` on every frame did not keep up either. The disc now keeps
+  a fixed shape throughout; its arrival is carried entirely by what happens
+  inside the glass. Scaling the blur with a layer transform had the same class
+  of problem for a different reason: it resamples a blur that has already been
+  captured, which leaves a visibly cut edge.
+- **The opening is a bloom now, in phases.** The glass fades up first as a stage
+  to arrive on, the centre pops out of it, then the petals sweep open on a 19ms
+  stagger — each one growing outward *and* turning into place, all the same way,
+  so the wheel unwinds rather than the petals simply getting longer. Labels are
+  clipped to their own petal, so none can ghost outside one that is still
+  growing.
+- The rim light around the edge is smaller and much shorter — a catch of light
+  as the flower opens rather than a halo thrown across the desktop.
+
 ## 0.7.0
 
 - **Menu-bar icon is a five-petal daisy.** The eight-petal app mark closes into
