@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.8.0
+
+- **Fixed: Quit did nothing.** Every menu item was pointed at the app delegate,
+  including Quit, whose action was `NSApplication.terminate(_:)`. AppKit greys
+  out any item whose target cannot perform its action, so Quit was silently
+  disabled. `--selftest` now asserts that every menu item can actually fire its
+  action, and that check fails against the old wiring.
+- **Updates from Settings.** Settings shows the current version with a button
+  that checks GitHub Releases and turns into Update when there is a newer one,
+  plus an opt-in daily background check. Also in the menu bar as
+  **Check for Updates…**.
+- Nothing installs without two independent checks: the download must match the
+  SHA-256 published with the release (a release without one is refused, not
+  trusted), and the app inside must satisfy the running app's own code-signing
+  requirement. Ad-hoc builds can never satisfy that — their requirement pins
+  the exact code hash — so they verify the image and reveal it in Finder for
+  you to install by hand. Automatic in-place updates start working the day
+  Daisy is signed with a Developer ID.
+- Only GitHub hosts are ever contacted or opened; URLs read out of the release
+  JSON are checked against an allowlist rather than trusted.
+- `make-dmg.sh` now writes `dist/SHA256SUMS.txt` alongside the image. It has to
+  ship with the release or the updater refuses the download.
+- New `--update-check` diagnostic prints what the updater sees.
+
 ## 0.7.1
 
 - **Fixed the ring that cut around the wheel while it opened.** A window's drop

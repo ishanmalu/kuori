@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 
 /// `Daisy --selftest` runs the checks that must hold for the conversion graph to
@@ -184,6 +185,41 @@ enum SelfTest {
         expect(InputSet.expand([plain]).folder == nil, "a plain file expands to itself")
         expect(InputSet.expand([plain, photos]).files.count == 2, "a mixed multi-drop is left alone")
         try? fm.removeItem(at: root)
+
+        section("updates")
+        expect(Updater.isNewer("0.8.0", than: "0.7.1"), "0.8.0 is newer than 0.7.1")
+        expect(Updater.isNewer("0.10.0", than: "0.9.0"), "0.10.0 is newer than 0.9.0 (numeric, not lexical)")
+        expect(!Updater.isNewer("0.7.1", than: "0.7.1"), "the same version is not an update")
+        expect(!Updater.isNewer("0.7.0", than: "0.7.1"), "an older version is not an update")
+        expect(Updater.isNewer("1.0", than: "0.9.9"), "a shorter version still compares correctly")
+        // The release JSON is attacker-controlled if GitHub is ever
+        // compromised, so every URL taken from it is checked, not trusted.
+        expect(Updater.isTrusted(URL(string: "https://github.com/ishanmalu/daisy/releases")!),
+               "github.com over https is trusted")
+        expect(Updater.isTrusted(URL(string: "https://objects.githubusercontent.com/x.dmg")!),
+               "the release asset host is trusted")
+        expect(!Updater.isTrusted(URL(string: "http://github.com/x.dmg")!), "plain http is refused")
+        expect(!Updater.isTrusted(URL(string: "https://evil.example.com/x.dmg")!),
+               "an unknown host is refused")
+        expect(!Updater.isTrusted(URL(string: "https://github.com.evil.example/x.dmg")!),
+               "a lookalike host is refused")
+        // Ad-hoc builds pin their own code hash, so they can never accept an
+        // update in place. That is the right answer, and worth asserting.
+        expect(!UpdateInstaller.probeRequirement(Bundle.main.bundleURL)
+               || UpdateInstaller.canInstallInPlace,
+               "in-place install is only ever offered when the signature matches")
+
+        section("menu bar")
+        let delegate = AppDelegate()
+        let menu = delegate.makeMenu()
+        expect(menu.items.contains { $0.title.hasPrefix("Quit") }, "the menu offers a way to quit")
+        for item in menu.items where item.action != nil {
+            // AppKit silently greys out an item whose target cannot perform its
+            // action, which is exactly how Quit broke: it was wired straight to
+            // NSApplication.terminate and then re-targeted at the delegate.
+            let ok = (item.target as? NSObject)?.responds(to: item.action!) ?? false
+            expect(ok, "menu item \(item.title.trimmingCharacters(in: .whitespaces)) can fire its action")
+        }
 
         section("engine availability (informational)")
         for id in [EngineID.ffmpeg, .vips, .cwebp, .resvg, .potrace, .pandoc, .qpdf, .sevenzip, .unar, .bsdtar, .exiftool] {

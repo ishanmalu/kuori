@@ -59,6 +59,35 @@ if args.first == "--demo" {
     app.run()
 }
 
+// `--update-check` runs the real update check and prints what it found, so the
+// network path can be exercised without going through the menu bar.
+if args.first == "--update-check" {
+    app.setActivationPolicy(.prohibited)
+    Task { @MainActor in
+        let u = Updater.shared
+        print("current   \(u.currentVersion)")
+        print("in place  \(UpdateInstaller.canInstallInPlace ? "yes" : "no (will download and reveal)")")
+        u.onChange = { state in
+            switch state {
+            case .checking: return
+            default:
+                print("result    \(state.message)")
+                if let r = u.release {
+                    print("latest    \(r.version)")
+                    print("dmg       \(r.dmgURL?.absoluteString ?? "— none published")")
+                    print("checksum  \(r.checksumURL?.absoluteString ?? "— none published (download would be refused)")")
+                }
+                exit(0)
+            }
+        }
+        u.check()
+    }
+    DispatchQueue.main.asyncAfter(deadline: .now() + 20) {
+        print("timed out"); exit(1)
+    }
+    app.run()
+}
+
 // `--drag-probe` reports whether a global mouse-drag monitor gets events here.
 if args.first == "--drag-probe" {
     app.setActivationPolicy(.prohibited)

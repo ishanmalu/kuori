@@ -9,6 +9,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         WatchFolders.shared.load()
         WatchFolders.shared.start()
         DragMonitor.shared.start()
+        // Opt-in, once a day at most, and only ever talks to GitHub.
+        Updater.shared.checkInBackgroundIfDue()
         Hotkey.register { DropPanel.shared.summon() }
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -16,21 +18,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             button.image = Self.menuBarIcon()
         }
 
+        statusItem.menu = makeMenu()
+    }
+
+    /// Every item is handled here, `quit` included. Routing quit straight to
+    /// `NSApplication.terminate(_:)` and then pointing the whole menu at this
+    /// object silently disables it — AppKit greys out any item whose target
+    /// does not respond to its action, and an `NSObject` does not implement
+    /// `terminate`. `SelfTest` now asserts every item can actually fire.
+    func makeMenu() -> NSMenu {
         let menu = NSMenu()
         menu.addItem(withTitle: "Open Wheel  \(Hotkey.label)", action: #selector(openDropZone), keyEquivalent: "")
         menu.addItem(withTitle: "Convert File…", action: #selector(chooseAndConvert), keyEquivalent: "o")
         menu.addItem(withTitle: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
+        menu.addItem(withTitle: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
         menu.addItem(.separator())
         let ver = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "dev"
         menu.addItem(withTitle: "Daisy \(ver)", action: nil, keyEquivalent: "").isEnabled = false
-        menu.addItem(withTitle: "Quit Daisy", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        menu.addItem(withTitle: "Quit Daisy", action: #selector(quit), keyEquivalent: "q")
         menu.items.forEach { $0.target = self }
-        statusItem.menu = menu
+        return menu
     }
+
+    @objc private func quit() { NSApp.terminate(nil) }
 
     @objc private func openDropZone() { DropPanel.shared.toggle() }
     @objc private func chooseAndConvert() { DropPanel.shared.summonAndChoose() }
     @objc private func openSettings() { SettingsWindow.shared.show() }
+    @objc private func checkForUpdates() { SettingsWindow.shared.showAndCheck() }
 
     /// Finder → Services → "Convert with Daisy…"
     @objc func convertFiles(_ pboard: NSPasteboard, userData: String, error: AutoreleasingUnsafeMutablePointer<NSString>) {
